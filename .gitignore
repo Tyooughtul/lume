@@ -1,0 +1,40 @@
+# Binaries
+lume
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go vendor directory
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build directories
+dist/
+build/
+
+# Local config
+.env
+.env.local
+
+# Temporary files
+*.tmp
+*.temp
+interview.html
+backup.md

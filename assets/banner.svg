@@ -1,0 +1,279 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400">
+  <defs>
+    <!-- Background -->
+    <radialGradient id="bgGlow" cx="50%" cy="30%" r="68%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#030712"/>
+    </radialGradient>
+
+    <!-- Ambient warm light pool from the lantern -->
+    <radialGradient id="warmPool" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.13"/>
+      <stop offset="40%" stop-color="#f59e0b" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Lantern metal frame -->
+    <linearGradient id="metalFrame" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d4b896"/>
+      <stop offset="50%" stop-color="#b8966e"/>
+      <stop offset="100%" stop-color="#8b7355"/>
+    </linearGradient>
+
+    <!-- Lantern glass fill -->
+    <linearGradient id="glassFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a150c"/>
+      <stop offset="100%" stop-color="#0d0a05"/>
+    </linearGradient>
+
+    <!-- Title text shimmer -->
+    <linearGradient id="textFill" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d1d5db"/>
+      <stop offset="50%" stop-color="#f9fafb"/>
+      <stop offset="100%" stop-color="#d1d5db"/>
+    </linearGradient>
+
+    <!-- Accent line fade -->
+    <linearGradient id="accentLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="bigGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="38"/>
+    </filter>
+    <filter id="medGlow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+    <filter id="flameBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feComposite in="SourceGraphic" in2="b" operator="over"/>
+    </filter>
+    <filter id="dotGlow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="2.2"/>
+    </filter>
+
+    <!-- Background dot pattern -->
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+      <circle cx="11" cy="11" r="0.4" fill="#fff" opacity="0.025"/>
+    </pattern>
+  </defs>
+
+  <!-- ===================== BACKGROUND ===================== -->
+  <rect width="960" height="400" fill="url(#bgGlow)"/>
+  <rect width="960" height="400" fill="url(#dots)"/>
+  <rect x="0.5" y="0.5" width="959" height="399" rx="16" fill="none" stroke="#1f2937" stroke-width="1"/>
+
+  <!-- ===================== AMBIENT LIGHT ===================== -->
+  <ellipse cx="480" cy="125" rx="240" ry="180" fill="url(#warmPool)" filter="url(#bigGlow)">
+    <animate attributeName="rx" values="240;255;240" dur="10s" repeatCount="indefinite"/>
+    <animate attributeName="ry" values="180;190;180" dur="10s" repeatCount="indefinite"/>
+  </ellipse>
+
+  <!-- ===================== LIGHT CONE (downward scan beam) ===================== -->
+  <path d="M480,162 L395,232 Q480,252 565,232 Z" fill="#fbbf24" opacity="0.025"/>
+  <path d="M480,162 L420,220 Q480,238 540,220 Z" fill="#fbbf24" opacity="0.04"/>
+
+  <!-- ===================== LIGHT RAYS ===================== -->
+  <g opacity="0.035" stroke="#fcd34d" stroke-width="0.7" stroke-linecap="round">
+    <line x1="480" y1="125" x2="350" y2="62"/>
+    <line x1="480" y1="125" x2="610" y2="62"/>
+    <line x1="480" y1="125" x2="322" y2="125"/>
+    <line x1="480" y1="125" x2="638" y2="125"/>
+    <line x1="480" y1="125" x2="365" y2="200"/>
+    <line x1="480" y1="125" x2="595" y2="200"/>
+    <line x1="480" y1="125" x2="418" y2="218"/>
+    <line x1="480" y1="125" x2="542" y2="218"/>
+    <line x1="480" y1="125" x2="390" y2="82"/>
+    <line x1="480" y1="125" x2="570" y2="82"/>
+  </g>
+
+  <!-- ===================== SCAN ORBIT ===================== -->
+  <circle cx="480" cy="125" r="112" fill="none" stroke="#fbbf24" stroke-width="0.35"
+          stroke-dasharray="3 9" opacity="0.08">
+    <animateTransform attributeName="transform" type="rotate"
+                      from="0 480 125" to="360 480 125" dur="60s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- ===================== THE LANTERN ===================== -->
+  <g transform="translate(480, 125)">
+    <!-- Far glow -->
+    <circle r="65" fill="#fbbf24" opacity="0.07" filter="url(#medGlow)"/>
+    <circle r="38" fill="#fef3c7" opacity="0.11" filter="url(#medGlow)"/>
+
+    <!-- Handle: brass arc -->
+    <path d="M-8,-58 Q-8,-72 0,-72 Q8,-72 8,-58"
+          fill="none" stroke="url(#metalFrame)" stroke-width="2.8" stroke-linecap="round"/>
+
+    <!-- Top plate -->
+    <rect x="-18" y="-58" width="36" height="8" rx="2.5" fill="url(#metalFrame)"/>
+
+    <!-- Upper taper (metal shoulder) -->
+    <path d="M-18,-50 L-15,-44 L15,-44 L18,-50 Z" fill="#a08060"/>
+
+    <!-- Main glass body -->
+    <rect x="-15" y="-44" width="30" height="66" rx="3.5"
+          fill="url(#glassFill)" stroke="#8b7355" stroke-width="1.2"/>
+
+    <!-- Glass panel vertical ribs -->
+    <line x1="-5" y1="-44" x2="-5" y2="22" stroke="#8b7355" stroke-width="0.35" opacity="0.45"/>
+    <line x1="5" y1="-44" x2="5" y2="22" stroke="#8b7355" stroke-width="0.35" opacity="0.45"/>
+
+    <!-- Horizontal mid-rib -->
+    <line x1="-15" y1="-10" x2="15" y2="-10" stroke="#8b7355" stroke-width="0.3" opacity="0.3"/>
+
+    <!-- Inner flame: 5-layer glow stack -->
+    <ellipse cx="0" cy="-10" rx="10" ry="22" fill="#f59e0b" opacity="0.2" filter="url(#dotGlow)"/>
+    <ellipse cx="0" cy="-12" rx="8" ry="17" fill="#fbbf24" opacity="0.45" filter="url(#flameBlur)"/>
+    <ellipse cx="0" cy="-14" rx="5" ry="11" fill="#fde68a" opacity="0.75"/>
+    <ellipse cx="0" cy="-15" rx="3" ry="7" fill="#fef9c3" opacity="0.9"/>
+    <ellipse cx="0" cy="-16" rx="1.5" ry="4" fill="#ffffff" opacity="0.95"/>
+
+    <!-- Flame flicker animation -->
+    <ellipse cx="0" cy="-13" rx="6" ry="13" fill="#fbbf24" opacity="0.15">
+      <animate attributeName="ry" values="13;15;13" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.15;0.08;0.15" dur="3s" repeatCount="indefinite"/>
+    </ellipse>
+
+    <!-- Glass reflections -->
+    <line x1="-12" y1="-40" x2="-12" y2="18" stroke="#fef3c7" stroke-width="0.5" opacity="0.09"/>
+    <line x1="12" y1="-36" x2="12" y2="16" stroke="#fef3c7" stroke-width="0.4" opacity="0.05"/>
+
+    <!-- Lower taper (metal foot) -->
+    <path d="M-15,22 L-18,28 L18,28 L15,22 Z" fill="#a08060"/>
+
+    <!-- Base plate -->
+    <rect x="-18" y="28" width="36" height="7" rx="2.5" fill="url(#metalFrame)"/>
+    <!-- Base foot -->
+    <rect x="-14" y="35" width="28" height="4" rx="1.5" fill="#8b7355"/>
+  </g>
+
+  <!-- ===================== REVEALED DATA ICONS ===================== -->
+  <!-- Thin-line icons around the lantern representing discovered junk types -->
+
+  <!-- 1. Cache file (page with folded corner) — upper-left -->
+  <g transform="translate(404, 88)" stroke="#fbbf24" stroke-width="1" fill="none" opacity="0.38">
+    <path d="M0,0 L8,0 L11.5,3.5 L11.5,15 L0,15 Z"/>
+    <path d="M8,0 L8,3.5 L11.5,3.5"/>
+    <animate attributeName="opacity" values="0.38;0.2;0.38" dur="6s" repeatCount="indefinite"/>
+  </g>
+
+  <!-- 2. Settings / cache gear — upper-right -->
+  <g transform="translate(543, 92)" stroke="#fbbf24" stroke-width="0.9" fill="none" opacity="0.32">
+    <circle cx="7" cy="7" r="4.2"/>
+    <circle cx="7" cy="7" r="1.8" fill="#fbbf24" fill-opacity="0.15"/>
+    <line x1="7" y1="0.5" x2="7" y2="2"/>
+    <line x1="7" y1="12" x2="7" y2="13.5"/>
+    <line x1="0.5" y1="7" x2="2" y2="7"/>
+    <line x1="12" y1="7" x2="13.5" y2="7"/>
+    <line x1="2.2" y1="2.2" x2="3.4" y2="3.4"/>
+    <line x1="10.6" y1="10.6" x2="11.8" y2="11.8"/>
+    <line x1="11.8" y1="2.2" x2="10.6" y2="3.4"/>
+    <line x1="3.4" y1="10.6" x2="2.2" y2="11.8"/>
+    <animate attributeName="opacity" values="0.32;0.18;0.32" dur="7s" repeatCount="indefinite"/>
+  </g>
+
+  <!-- 3. Duplicate files (two overlapping pages) — left -->
+  <g transform="translate(388, 152)" stroke="#fbbf24" stroke-width="0.9" fill="none" opacity="0.28">
+    <rect x="3.5" y="0" width="10" height="13" rx="1"/>
+    <rect x="0" y="3.5" width="10" height="13" rx="1"/>
+    <animate attributeName="opacity" values="0.28;0.14;0.28" dur="8s" repeatCount="indefinite"/>
+  </g>
+
+  <!-- 4. Folder icon — right -->
+  <g transform="translate(563, 148)" stroke="#fbbf24" stroke-width="0.9" fill="none" opacity="0.26">
+    <path d="M0,4 L3.5,0.5 L7.5,0.5 L7.5,4 L15,4 L15,12.5 L0,12.5 Z"/>
+    <animate attributeName="opacity" values="0.26;0.13;0.26" dur="9s" repeatCount="indefinite"/>
+  </g>
+
+  <!-- 5. Browser globe — far left -->
+  <g transform="translate(372, 120)" stroke="#fbbf24" stroke-width="0.75" fill="none" opacity="0.18">
+    <circle cx="6.5" cy="6.5" r="6"/>
+    <ellipse cx="6.5" cy="6.5" rx="2.8" ry="6"/>
+    <line x1="0.5" y1="6.5" x2="12.5" y2="6.5"/>
+    <path d="M1.5,3.5 Q6.5,4.5 11.5,3.5" fill="none"/>
+    <path d="M1.5,9.5 Q6.5,8.5 11.5,9.5" fill="none"/>
+  </g>
+
+  <!-- 6. Log / text file — far right -->
+  <g transform="translate(580, 118)" stroke="#fbbf24" stroke-width="0.75" fill="none" opacity="0.18">
+    <rect x="0" y="0" width="12" height="16" rx="1.5"/>
+    <line x1="2.5" y1="4" x2="9.5" y2="4"/>
+    <line x1="2.5" y1="7" x2="8" y2="7"/>
+    <line x1="2.5" y1="10" x2="9" y2="10"/>
+    <line x1="2.5" y1="13" x2="6" y2="13"/>
+  </g>
+
+  <!-- 7. Large file (download arrow) — lower center-left -->
+  <g transform="translate(428, 198)" stroke="#fbbf24" stroke-width="0.8" fill="none" opacity="0.15">
+    <rect x="0" y="0" width="11" height="14" rx="1"/>
+    <line x1="5.5" y1="3" x2="5.5" y2="9.5"/>
+    <path d="M3,7.5 L5.5,10.5 L8,7.5"/>
+  </g>
+
+  <!-- 8. App residual (box with X) — lower center-right -->
+  <g transform="translate(525, 195)" stroke="#fbbf24" stroke-width="0.8" fill="none" opacity="0.15">
+    <rect x="0" y="0" width="13" height="13" rx="2"/>
+    <line x1="3.5" y1="3.5" x2="9.5" y2="9.5"/>
+    <line x1="9.5" y1="3.5" x2="3.5" y2="9.5"/>
+  </g>
+
+  <!-- ===================== FLOATING PARTICLES ===================== -->
+  <g>
+    <circle cx="432" cy="78" r="1.3" fill="#fde68a" opacity="0.32" filter="url(#dotGlow)">
+      <animate attributeName="cy" values="78;73;78" dur="7s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="534" cy="84" r="1.0" fill="#fef3c7" opacity="0.26" filter="url(#dotGlow)">
+      <animate attributeName="cy" values="84;80;84" dur="5.5s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="400" cy="138" r="1.1" fill="#fbbf24" opacity="0.2"/>
+    <circle cx="562" cy="142" r="0.9" fill="#fef9c3" opacity="0.18"/>
+    <circle cx="445" cy="205" r="1.0" fill="#fbbf24" opacity="0.12" filter="url(#dotGlow)">
+      <animate attributeName="opacity" values="0.12;0.06;0.12" dur="8s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="520" cy="200" r="0.8" fill="#fde68a" opacity="0.1"/>
+
+    <!-- Distant cool particles -->
+    <circle cx="358" cy="108" r="0.6" fill="#93c5fd" opacity="0.06"/>
+    <circle cx="602" cy="112" r="0.55" fill="#7dd3fc" opacity="0.05"/>
+    <circle cx="345" cy="148" r="0.5" fill="#bae6fd" opacity="0.04"/>
+    <circle cx="618" cy="152" r="0.5" fill="#93c5fd" opacity="0.04"/>
+  </g>
+
+  <!-- ===================== SAFETY BADGE ===================== -->
+  <!-- Shield + checkmark: the "never rm" safety guarantee -->
+  <g transform="translate(480, 238)" opacity="0.32">
+    <path d="M-7,-8 L0,-12 L7,-8 L7,2 Q7,7.5 0,11 Q-7,7.5 -7,2 Z"
+          fill="none" stroke="#34d399" stroke-width="0.9"/>
+    <path d="M-3,0.5 L-0.5,3.5 L4,-2.5"
+          fill="none" stroke="#34d399" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <!-- ===================== TYPOGRAPHY ===================== -->
+  <text x="480" y="294"
+        text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif"
+        font-size="52" font-weight="700"
+        fill="url(#textFill)"
+        letter-spacing="18">LUME</text>
+
+  <text x="480" y="326"
+        text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif"
+        font-size="12" font-weight="400"
+        fill="#6b7280"
+        letter-spacing="3.5">THE SAFE MACOS CLEANUP TOOL</text>
+
+  <!-- Decorative divider -->
+  <line x1="385" y1="348" x2="575" y2="348" stroke="url(#accentLine)" stroke-width="0.8"/>
+
+  <!-- ===================== CORNER FRAME ===================== -->
+  <g stroke="#1f2937" stroke-width="1.2" stroke-linecap="round" opacity="0.5">
+    <polyline points="20,32 20,20 32,20" fill="none"/>
+    <polyline points="940,32 940,20 928,20" fill="none"/>
+    <polyline points="20,368 20,380 32,380" fill="none"/>
+    <polyline points="940,368 940,380 928,380" fill="none"/>
+  </g>
+</svg>
