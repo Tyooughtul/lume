@@ -53,7 +53,7 @@ func NewAppUninstallerView() *AppUninstallerView {
 	}
 }
 
-func (m AppUninstallerView) Init() tea.Cmd {
+func (m *AppUninstallerView) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		m.startScan(),

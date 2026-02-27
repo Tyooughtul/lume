@@ -54,7 +54,7 @@ func NewDuplicatesView() *DuplicatesView {
 	}
 }
 
-func (m DuplicatesView) Init() tea.Cmd {
+func (m *DuplicatesView) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		m.startScan(),

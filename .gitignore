@@ -39,3 +39,4 @@ build/
 *.temp
 interview.html
 backup.md
+/docs

@@ -39,6 +39,7 @@ func NewDiskTrend() *DiskTrend {
 }
 
 func (d *DiskTrend) Init() tea.Cmd {
+	d.loading = true
 	return d.loadTrendData()
 }
 

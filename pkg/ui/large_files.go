@@ -55,7 +55,7 @@ func NewLargeFilesView() *LargeFilesView {
 	}
 }
 
-func (m LargeFilesView) Init() tea.Cmd {
+func (m *LargeFilesView) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		m.startScan(),

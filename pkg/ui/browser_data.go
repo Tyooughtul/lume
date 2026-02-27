@@ -44,7 +44,7 @@ func NewBrowserDataView() *BrowserDataView {
 	}
 }
 
-func (m BrowserDataView) Init() tea.Cmd {
+func (m *BrowserDataView) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		m.startScan(),

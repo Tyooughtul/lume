@@ -58,7 +58,7 @@ func NewSystemJunkViewEnhanced() *SystemJunkViewEnhanced {
 	}
 }
 
-func (m SystemJunkViewEnhanced) Init() tea.Cmd {
+func (m *SystemJunkViewEnhanced) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		m.startScan(),
