@@ -26,7 +26,7 @@ func TestHistoryManager_RecordAndLoad(t *testing.T) {
 	hm := &HistoryManager{dataDir: tmpDir}
 
 	now := time.Now()
-	err := hm.RecordSnapshot(1000000, 500000, 10000, "test")
+	err := hm.RecordSnapshot(1000000, 500000, 10000, "test", "")
 	if err != nil {
 		t.Fatalf("RecordSnapshot failed: %v", err)
 	}

@@ -1,5 +1,6 @@
 # Binaries
-lume
+/lume
+lume-darwin-*
 *.exe
 *.dll
 *.so

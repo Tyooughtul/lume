@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"lume/pkg/scanner"
+	"github.com/Tyooughtul/lume/pkg/scanner"
 )
 
 // Cleaner handles file cleanup operations

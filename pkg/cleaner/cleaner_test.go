@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"lume/pkg/scanner"
+	"github.com/Tyooughtul/lume/pkg/scanner"
 )
 
 func TestNewCleaner(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
-	"lume/pkg/scanner"
+	"github.com/Tyooughtul/lume/pkg/scanner"
 )
 
 type DiskTrend struct {
@@ -16,6 +16,7 @@ type DiskTrend struct {
 	height        int
 	history       *scanner.HistoryManager
 	snapshots     []scanner.DiskSnapshot
+	trendData     *scanner.TrendData
 	stats         *scanner.HistoryStatistics
 	selectedRange int
 	ranges        []string
@@ -26,6 +27,7 @@ type DiskTrend struct {
 
 type trendLoadedMsg struct {
 	snapshots []scanner.DiskSnapshot
+	trendData *scanner.TrendData
 	stats     *scanner.HistoryStatistics
 	err       error
 }
@@ -54,6 +56,11 @@ func (d *DiskTrend) loadTrendData() tea.Cmd {
 			return trendLoadedMsg{err: err}
 		}
 
+		trendData, err := hm.GetTrendData(days)
+		if err != nil {
+			return trendLoadedMsg{err: err}
+		}
+
 		stats, err := hm.GetStatistics()
 		if err != nil {
 			return trendLoadedMsg{err: err}
@@ -61,6 +68,7 @@ func (d *DiskTrend) loadTrendData() tea.Cmd {
 
 		return trendLoadedMsg{
 			snapshots: snapshots,
+			trendData: trendData,
 			stats:     stats,
 		}
 	}
@@ -113,6 +121,7 @@ func (d *DiskTrend) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d.loading = false
 		d.err = msg.err
 		d.snapshots = msg.snapshots
+		d.trendData = msg.trendData
 		d.stats = msg.stats
 		d.cursor = 0
 	}
@@ -159,6 +168,12 @@ func (d *DiskTrend) View() string {
 		b.WriteString(DimStyle.Render("  No activity yet. Clean something to see the log!"))
 		b.WriteString("\n")
 	} else {
+		// Disk usage chart
+		if d.trendData != nil && len(d.trendData.Labels) > 0 {
+			chart := d.renderChart()
+			b.WriteString(chart)
+			b.WriteString("\n\n")
+		}
 		// Activity log
 		logContent := d.renderActivityLog()
 		b.WriteString(logContent)
@@ -248,6 +263,81 @@ func (d *DiskTrend) renderActivityLog() string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func (d *DiskTrend) renderChart() string {
+	if d.trendData == nil || len(d.trendData.Labels) == 0 {
+		return ""
+	}
+
+	chartWidth := min(d.width-10, 60)
+	chartHeight := 8
+
+	var maxUsed uint64
+	for _, v := range d.trendData.UsedData {
+		if v > maxUsed {
+			maxUsed = v
+		}
+	}
+
+	if maxUsed == 0 {
+		maxUsed = 1
+	}
+
+	// Create chart grid
+	chart := make([][]string, chartHeight)
+	for i := range chart {
+		chart[i] = make([]string, chartWidth)
+		for j := range chart[i] {
+			chart[i][j] = " "
+		}
+	}
+
+	dataPoints := len(d.trendData.UsedData)
+	if dataPoints > chartWidth {
+		dataPoints = chartWidth
+	}
+
+	step := float64(chartWidth) / float64(max(dataPoints-1, 1))
+
+	for i := 0; i < dataPoints; i++ {
+		x := int(float64(i) * step)
+		if x >= chartWidth {
+			x = chartWidth - 1
+		}
+
+		usedRatio := float64(d.trendData.UsedData[i]) / float64(maxUsed)
+		barHeight := int(usedRatio * float64(chartHeight-1))
+
+		for y := chartHeight - 1; y >= chartHeight-1-barHeight; y-- {
+			if y >= 0 && y < chartHeight {
+				chart[y][x] = "█"
+			}
+		}
+	}
+
+	var chartLines []string
+	for row := 0; row < chartHeight; row++ {
+		line := strings.Join(chart[row], "")
+		yAxis := fmt.Sprintf("%5s ", humanize.Bytes(uint64(float64(maxUsed)*float64(chartHeight-row)/float64(chartHeight))))
+		chartLines = append(chartLines, lipgloss.NewStyle().Foreground(GrayColor).Render(yAxis)+lipgloss.NewStyle().Foreground(PrimaryColor).Render(line))
+	}
+
+	xAxis := "      " + strings.Repeat("─", chartWidth)
+	chartLines = append(chartLines, lipgloss.NewStyle().Foreground(GrayColor).Render(xAxis))
+
+	if len(d.trendData.Labels) > 0 {
+		labels := "      "
+		labelStep := max(1, len(d.trendData.Labels)/4)
+		for i, l := range d.trendData.Labels {
+			if i%labelStep == 0 {
+				labels += l + "    "
+			}
+		}
+		chartLines = append(chartLines, lipgloss.NewStyle().Foreground(GrayColor).Render(labels))
+	}
+
+	return strings.Join(chartLines, "\n")
 }
 
 func (d *DiskTrend) formatLogEntry(s scanner.DiskSnapshot) string {

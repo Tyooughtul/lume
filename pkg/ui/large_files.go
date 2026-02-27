@@ -13,8 +13,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
 
-	"lume/pkg/cleaner"
-	"lume/pkg/scanner"
+	"github.com/Tyooughtul/lume/pkg/cleaner"
+	"github.com/Tyooughtul/lume/pkg/scanner"
 )
 
 type LargeFilesView struct {
