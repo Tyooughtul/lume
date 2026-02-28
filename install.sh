@@ -39,18 +39,18 @@ get_latest_version() {
 
 main() {
     echo ""
-    echo "🧹 Installing Lume..."
+    echo "[*] Installing Lume..."
     echo ""
 
     # 检测操作系统
     if [ "$(uname -s)" != "Darwin" ]; then
-        echo -e "${RED}✗ Lume only supports macOS${NC}"
+        echo -e "${RED}[X] Lume only supports macOS${NC}"
         exit 1
     fi
 
     ARCH=$(detect_arch)
     if [ "$ARCH" = "unknown" ]; then
-        echo -e "${RED}✗ Unsupported architecture: $(uname -m)${NC}"
+        echo -e "${RED}[X] Unsupported architecture: $(uname -m)${NC}"
         exit 1
     fi
 
@@ -58,7 +58,7 @@ main() {
 
     VERSION=$(get_latest_version)
     if [ -z "$VERSION" ]; then
-        echo -e "${RED}✗ Failed to fetch latest version${NC}"
+        echo -e "${RED}[X] Failed to fetch latest version${NC}"
         echo "  Please check your internet connection"
         exit 1
     fi
@@ -70,7 +70,7 @@ main() {
 
     echo "→ Downloading..."
     if ! curl -fsSL "$DOWNLOAD_URL" -o "$TMP_FILE" 2>/dev/null; then
-        echo -e "${RED}✗ Download failed${NC}"
+        echo -e "${RED}[X] Download failed${NC}"
         echo "  URL: $DOWNLOAD_URL"
         exit 1
     fi
@@ -86,7 +86,7 @@ main() {
     fi
 
     echo ""
-    echo -e "${GREEN}✓ Lume installed successfully!${NC}"
+    echo -e "${GREEN}[OK] Lume installed successfully!${NC}"
     echo ""
     echo "  Run 'lume' to start cleaning"
     echo "  Run 'lume -help' for more options"

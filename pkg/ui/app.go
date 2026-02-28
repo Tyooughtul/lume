@@ -1,21 +1,25 @@
 package ui
 
 import (
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // App is the main application model
 type App struct {
-	currentView  ViewType
-	mainMenu     *MainMenu
-	systemJunk   *SystemJunkViewEnhanced
-	largeFiles   *LargeFilesView
-	appUninstall *AppUninstallerView
-	duplicates   *DuplicatesView
-	browserData  *BrowserDataView
-	diskTrend    *DiskTrend
-	width        int
-	height       int
+	currentView    ViewType
+	mainMenu       *MainMenu
+	systemJunk     *SystemJunkViewEnhanced
+	largeFiles     *LargeFilesView
+	appUninstall   *AppUninstallerView
+	duplicates     *DuplicatesView
+	browserData    *BrowserDataView
+	diskTrend      *DiskTrend
+	width          int
+	height         int
+	themeNotif     string // 主题切换通知
+	themeNotifTick int    // 通知显示计数
 }
 
 // NewApp creates the main application
@@ -37,6 +41,12 @@ func (a App) Init() tea.Cmd {
 	return a.mainMenu.Init()
 }
 
+// ThemeChangedMsg 主题切换消息
+type ThemeChangedMsg struct{}
+
+// tickMsg 用于通知计时器
+type tickMsg struct{}
+
 // Update handles state updates
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -56,6 +66,28 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.browserData.height = msg.Height
 		a.diskTrend.width = msg.Width
 		a.diskTrend.height = msg.Height
+
+	case tea.KeyMsg:
+		// 全局快捷键：t 切换主题
+		if msg.String() == "t" && a.currentView == ViewMainMenu && GlobalThemeManager != nil {
+			nextTheme := GlobalThemeManager.NextTheme()
+			if nextTheme != "" {
+				a.themeNotif = GlobalThemeManager.CurrentTheme.Description
+				a.themeNotifTick = 40 // 显示约 2 秒
+				a.mainMenu.ThemeNotif = a.themeNotif
+				return a, tickCmd()
+			}
+		}
+
+	case tickMsg:
+		if a.themeNotifTick > 0 {
+			a.themeNotifTick--
+			if a.themeNotifTick == 0 {
+				a.themeNotif = ""
+				a.mainMenu.ThemeNotif = ""
+			}
+			return a, tickCmd()
+		}
 
 	case MenuSelectedMsg:
 		// Menu selection, switch view
@@ -133,24 +165,34 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
+// tickCmd 创建定时器命令（50ms 间隔）
+func tickCmd() tea.Cmd {
+	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
+		return tickMsg{}
+	})
+}
+
 // View renders the current view
 func (a App) View() string {
+	var content string
 	switch a.currentView {
 	case ViewMainMenu:
-		return a.mainMenu.View()
+		content = a.mainMenu.View()
 	case ViewSystemJunk:
-		return a.systemJunk.View()
+		content = a.systemJunk.View()
 	case ViewLargeFiles:
-		return a.largeFiles.View()
+		content = a.largeFiles.View()
 	case ViewAppUninstaller:
-		return a.appUninstall.View()
+		content = a.appUninstall.View()
 	case ViewDuplicates:
-		return a.duplicates.View()
+		content = a.duplicates.View()
 	case ViewBrowserData:
-		return a.browserData.View()
+		content = a.browserData.View()
 	case ViewDiskTrend:
-		return a.diskTrend.View()
+		content = a.diskTrend.View()
 	default:
-		return "Unknown view"
+		content = "Unknown view"
 	}
+
+	return content
 }

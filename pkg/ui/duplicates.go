@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -43,7 +42,7 @@ func NewDuplicatesView() *DuplicatesView {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(PrimaryColor)
 
-	homeDir, _ := os.UserHomeDir()
+	homeDir := scanner.GetRealHomeDir()
 
 	return &DuplicatesView{
 		spinner:    s,
@@ -219,7 +218,7 @@ func (m DuplicatesView) View() string {
 
 	var b strings.Builder
 
-	b.WriteString(PageHeader("🔍", "Duplicate Files", m.width))
+	b.WriteString(PageHeader("", "Duplicate Files", m.width))
 	b.WriteString("\n")
 	b.WriteString(DimStyle.Render(fmt.Sprintf("  Scanning: %s", m.rootPath)))
 	b.WriteString("\n\n")
@@ -310,7 +309,7 @@ func (m DuplicatesView) View() string {
 
 	b.WriteString("\n\n")
 	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "↑↓", Desc: "navigate"},
+		{Key: "j/k", Desc: "navigate"},
 		{Key: "space", Desc: "toggle"},
 		{Key: "a", Desc: "all"},
 		{Key: "i", Desc: "info"},
@@ -324,7 +323,7 @@ func (m DuplicatesView) View() string {
 func (m DuplicatesView) detailView() string {
 	var b strings.Builder
 
-	b.WriteString(PageHeader("🔍", "Duplicate Details", m.width))
+	b.WriteString(PageHeader("", "Duplicate Details", m.width))
 	b.WriteString("\n\n")
 
 	if m.cursor < len(m.groups) {
@@ -340,7 +339,7 @@ func (m DuplicatesView) detailView() string {
 		for i, file := range group.Files {
 			marker := "  "
 			if m.keepNewest && i == 0 {
-				marker = "✓ "
+				marker = "* "
 			}
 			shortPath := file.Path
 			if len(shortPath) > 50 {
@@ -356,7 +355,7 @@ func (m DuplicatesView) detailView() string {
 		b.WriteString("\n")
 		b.WriteString(InfoBoxStyle.Render(fmt.Sprintf("Strategy: %s (press 't' to toggle)", strategy)))
 		b.WriteString("\n\n")
-		b.WriteString(WarningStyle.Render("⚠ This action cannot be undone"))
+		b.WriteString(WarningStyle.Render("[!] This action cannot be undone"))
 	}
 
 	return Center(m.width, m.height, b.String())

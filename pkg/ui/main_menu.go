@@ -32,14 +32,15 @@ const (
 )
 
 type MainMenu struct {
-	items     []MenuItem
-	cursor    int
-	spinner   spinner.Model
-	diskTotal uint64
-	diskUsed  uint64
-	width     int
-	height    int
-	err       error
+	items      []MenuItem
+	cursor     int
+	spinner    spinner.Model
+	diskTotal  uint64
+	diskUsed   uint64
+	width      int
+	height     int
+	err        error
+	ThemeNotif string // transient theme-switch notification
 }
 
 func NewMainMenu() *MainMenu {
@@ -49,12 +50,12 @@ func NewMainMenu() *MainMenu {
 
 	return &MainMenu{
 		items: []MenuItem{
-			{Name: "System Junk", Description: "Clean system cache and logs", Icon: "🗑️", View: ViewSystemJunk},
-			{Name: "Large Files", Description: "Find large files", Icon: "📁", View: ViewLargeFiles},
-			{Name: "App Uninstaller", Description: "Uninstall apps completely", Icon: "📦", View: ViewAppUninstaller},
-			{Name: "Duplicate Files", Description: "Find duplicate files", Icon: "🔍", View: ViewDuplicates},
-			{Name: "Browser Data", Description: "Clean browser cache", Icon: "🌐", View: ViewBrowserData},
-			{Name: "Disk Trend", Description: "View disk usage history", Icon: "📊", View: ViewDiskTrend},
+			{Name: "System Junk", Description: "Clean system cache and logs", Icon: "*", View: ViewSystemJunk},
+			{Name: "Large Files", Description: "Find large files", Icon: "*", View: ViewLargeFiles},
+			{Name: "App Uninstaller", Description: "Uninstall apps completely", Icon: "*", View: ViewAppUninstaller},
+			{Name: "Duplicate Files", Description: "Find duplicate files", Icon: "*", View: ViewDuplicates},
+			{Name: "Browser Data", Description: "Clean browser cache", Icon: "*", View: ViewBrowserData},
+			{Name: "Disk Trend", Description: "View disk usage history", Icon: "*", View: ViewDiskTrend},
 		},
 		spinner: s,
 	}
@@ -101,14 +102,27 @@ func (m *MainMenu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// menuItemColors assigns each menu item a unique accent color
-var menuItemColors = []lipgloss.Color{
-	lipgloss.Color("#ff5f87"), // System Junk
-	lipgloss.Color("#ffd75f"), // Large Files
-	lipgloss.Color("#d787ff"), // App Uninstaller
-	lipgloss.Color("#5fafff"), // Duplicate Files
-	lipgloss.Color("#5fd787"), // Browser Data
-	lipgloss.Color("#ff8700"), // Disk Trend
+// getMenuItemColors returns colors based on current theme
+func getMenuItemColors() []lipgloss.Color {
+	if GlobalThemeManager == nil {
+		return []lipgloss.Color{
+			lipgloss.Color("#ff5f87"),
+			lipgloss.Color("#ffd75f"),
+			lipgloss.Color("#d787ff"),
+			lipgloss.Color("#5fafff"),
+			lipgloss.Color("#5fd787"),
+			lipgloss.Color("#ff8700"),
+		}
+	}
+	t := &GlobalThemeManager.CurrentTheme
+	return []lipgloss.Color{
+		t.PrimaryColor(),
+		t.WarningColor(),
+		t.AccentColor(),
+		t.SecondaryColor(),
+		t.SuccessColor(),
+		lipgloss.Color("#ff8700"),
+	}
 }
 
 func (m MainMenu) View() string {
@@ -121,21 +135,26 @@ func (m MainMenu) View() string {
 	// Brand header
 	b.WriteString(Logo())
 	b.WriteString("\n")
-	b.WriteString(DimStyle.Render(strings.Repeat("─", ContentWidth)))
+	b.WriteString(DimStyle.Render(strings.Repeat("-", ContentWidth)))
 	b.WriteString("\n\n")
 
-	// Menu items — colored bullets for reliable alignment (no emoji)
+	// Menu items with colored indicators
+	colors := getMenuItemColors()
 	for i, item := range m.items {
 		name := padRight(item.Name, 20)
-		desc := item.Description
-		ci := i % len(menuItemColors)
+		desc := DimStyle.Render(item.Description)
+		ci := i % len(colors)
 
 		if i == m.cursor {
-			line := " ▸ ● " + name + "  " + desc
-			b.WriteString(SelectedScanItemStyle.Render(padRight(line, ContentWidth)))
+			// 选中项：高亮色名称 + > 游标
+			coloredName := lipgloss.NewStyle().Foreground(colors[ci]).Bold(true).Render(name)
+			line := " >  " + coloredName + "  " + desc
+			b.WriteString(SelectedScanItemStyle.Render(padRightAnsi(line, ContentWidth)))
 		} else {
-			dot := lipgloss.NewStyle().Foreground(menuItemColors[ci]).Render("●")
-			b.WriteString("   " + dot + " " + name + "  " + DimStyle.Render(desc))
+			// 非选中项：彩色名称
+			coloredName := lipgloss.NewStyle().Foreground(colors[ci]).Render(name)
+			line := "    " + coloredName + "  " + desc
+			b.WriteString(line)
 		}
 		b.WriteString("\n")
 	}
@@ -150,10 +169,24 @@ func (m MainMenu) View() string {
 
 	b.WriteString("\n")
 	b.WriteString(StyledHelpBar([]KeyHelp{
-		{"↑↓", "navigate"},
+		{"j/k", "navigate"},
 		{"enter", "select"},
+		{"t", "theme"},
 		{"q", "quit"},
 	}))
+
+	if m.ThemeNotif != "" {
+		notifColor := AccentColor
+		if GlobalThemeManager != nil {
+			notifColor = GlobalThemeManager.CurrentTheme.AccentColor()
+		}
+		notif := lipgloss.NewStyle().
+			Foreground(notifColor).
+			Bold(true).
+			Render("Theme: " + m.ThemeNotif)
+		b.WriteString("\n\n")
+		b.WriteString(notif)
+	}
 
 	return Center(m.width, m.height, b.String())
 }

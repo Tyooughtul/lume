@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -44,7 +43,7 @@ func NewLargeFilesView() *LargeFilesView {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(PrimaryColor)
 
-	homeDir, _ := os.UserHomeDir()
+	homeDir := scanner.GetRealHomeDir()
 
 	return &LargeFilesView{
 		spinner:  s,
@@ -242,7 +241,7 @@ func (m LargeFilesView) View() string {
 
 	var b strings.Builder
 
-	b.WriteString(PageHeader("📁", "Large Files", m.width))
+	b.WriteString(PageHeader("", "Large Files", m.width))
 	b.WriteString("\n")
 	b.WriteString("  ")
 	b.WriteString(DimStyle.Render(fmt.Sprintf("Scanning: %s (>50MB)", m.rootPath)))
@@ -336,7 +335,7 @@ func (m LargeFilesView) View() string {
 
 	b.WriteString("\n\n")
 	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "↑↓", Desc: "navigate"},
+		{Key: "j/k", Desc: "navigate"},
 		{Key: "space", Desc: "toggle"},
 		{Key: "a", Desc: "all"},
 		{Key: "d", Desc: "delete"},

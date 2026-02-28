@@ -31,7 +31,7 @@ func (s *EnhancedJunkScanner) GetErrors() []string {
 
 // BuildTargets builds the list of scan targets
 func (s *EnhancedJunkScanner) BuildTargets() []ScanTarget {
-	homeDir, _ := os.UserHomeDir()
+	homeDir := GetRealHomeDir()
 	
 	targets := []ScanTarget{
 		// === System Cache ===
@@ -605,9 +605,13 @@ func (s *EnhancedJunkScanner) Scan(progressCh chan<- string) ([]ScanTarget, erro
 					continue
 				}
 
-				size := getDirSizeDUFast(target.Path)
+				size, permErr := getDirSizeDUFastWithPermissionCheck(target.Path)
 				if size < 0 {
-					resultsCh <- scanResult{err: fmt.Sprintf("%s: cannot calculate size", target.Name)}
+					if permErr {
+						// Path exists but permission denied - likely macOS Full Disk Access restriction
+						resultsCh <- scanResult{err: fmt.Sprintf("%s: permission denied (grant Full Disk Access in System Settings)", target.Name)}
+					}
+					// Silently skip if path doesn't exist or permission denied
 					continue
 				}
 
@@ -648,24 +652,52 @@ func (s *EnhancedJunkScanner) Scan(progressCh chan<- string) ([]ScanTarget, erro
 }
 
 // getDirSizeDUFast uses the du command to quickly get directory size
+// It tolerates partial permission errors by using CombinedOutput and parsing stdout
 func getDirSizeDUFast(path string) int64 {
+	size, _ := getDirSizeDUFastWithPermissionCheck(path)
+	return size
+}
+
+// getDirSizeDUFastWithPermissionCheck uses du to get directory size and detects permission errors
+// Returns (size, isPermissionError)
+func getDirSizeDUFastWithPermissionCheck(path string) (int64, bool) {
 	cmd := exec.Command("du", "-sk", path)
-	output, err := cmd.Output()
+	// Use CombinedOutput so we still get stdout even if du exits non-zero
+	// (happens when some subdirectories are permission-denied)
+	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+	
+	// Check for macOS Full Disk Access permission error
+	// "Operation not permitted" indicates FDA restriction
+	isPermError := strings.Contains(outputStr, "Operation not permitted") ||
+		strings.Contains(outputStr, "Permission denied")
+	
+	// Try to parse even on error - du often prints partial results before failing
+	lines := strings.Split(outputStr, "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && strings.Contains(fields[1], path) {
+			sizeKB, parseErr := strconv.ParseInt(fields[0], 10, 64)
+			if parseErr == nil {
+				return sizeKB * 1024, false
+			}
+		}
+	}
+
+	// Fallback: try first line if it looks like a valid du output
+	fields := strings.Fields(outputStr)
+	if len(fields) >= 1 {
+		sizeKB, parseErr := strconv.ParseInt(fields[0], 10, 64)
+		if parseErr == nil {
+			return sizeKB * 1024, false
+		}
+	}
+
 	if err != nil {
-		return -1
+		return -1, isPermError
 	}
 
-	fields := strings.Fields(string(output))
-	if len(fields) < 1 {
-		return -1
-	}
-
-	sizeKB, err := strconv.ParseInt(fields[0], 10, 64)
-	if err != nil {
-		return -1
-	}
-
-	return sizeKB * 1024
+	return -1, false
 }
 
 // calculateDirSizeDeep deeply calculates directory size (correctly handles symlinks and sparse files)
@@ -792,7 +824,7 @@ func calculateDirSizeWithLimit(path string, currentDepth, maxFiles int, visited 
 
 // QuickScanLargeDirs quickly scans large directories for diagnostics
 func QuickScanLargeDirs(progressCh chan<- string) []ScanTarget {
-	homeDir, _ := os.UserHomeDir()
+	homeDir := GetRealHomeDir()
 	
 	checkPaths := []struct {
 		name string
@@ -833,7 +865,7 @@ func QuickScanLargeDirs(progressCh chan<- string) []ScanTarget {
 // AnalyzeSystemStorage analyzes system storage usage
 func AnalyzeSystemStorage() map[string]int64 {
 	result := make(map[string]int64)
-	homeDir, _ := os.UserHomeDir()
+	homeDir := GetRealHomeDir()
 
 	// Get disk overview
 	cmd := exec.Command("du", "-sh", homeDir)
@@ -864,4 +896,122 @@ func AnalyzeSystemStorage() map[string]int64 {
 func parseSize(output string) int64 {
 	// Simplified handling, actual implementation needs to parse du output
 	return 0
+}
+
+// DetailEntry represents a single entry in a detail view (file or subdirectory)
+type DetailEntry struct {
+	Name  string
+	Path  string
+	Size  int64
+	IsDir bool
+}
+
+// ScanTargetDetail scans the top-level contents of a target directory
+// and returns a list of entries sorted by size (largest first).
+func ScanTargetDetail(targetPath string) ([]DetailEntry, error) {
+	info, err := os.Lstat(targetPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// If not a directory, return the single file
+	if !info.IsDir() {
+		return []DetailEntry{{
+			Name:  filepath.Base(targetPath),
+			Path:  targetPath,
+			Size:  info.Size(),
+			IsDir: false,
+		}}, nil
+	}
+
+	entries, err := os.ReadDir(targetPath)
+	if err != nil {
+		return nil, err
+	}
+
+	type result struct {
+		entry DetailEntry
+		valid bool
+	}
+
+	numWorkers := runtime.NumCPU()
+	if numWorkers > 8 {
+		numWorkers = 8
+	}
+
+	jobs := make(chan os.DirEntry, len(entries))
+	results := make(chan result, len(entries))
+
+	var wg sync.WaitGroup
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for e := range jobs {
+				fullPath := filepath.Join(targetPath, e.Name())
+				fi, err := os.Lstat(fullPath)
+				if err != nil {
+					results <- result{}
+					continue
+				}
+				// Skip symlinks
+				if fi.Mode()&os.ModeSymlink != 0 {
+					results <- result{}
+					continue
+				}
+
+				de := DetailEntry{
+					Name:  e.Name(),
+					Path:  fullPath,
+					IsDir: fi.IsDir(),
+				}
+
+				if fi.IsDir() {
+					size := getDirSizeDUFast(fullPath)
+					if size < 0 {
+						size = 0
+					}
+					de.Size = size
+				} else {
+					de.Size = fi.Size()
+				}
+
+				results <- result{entry: de, valid: true}
+			}
+		}()
+	}
+
+	for _, e := range entries {
+		jobs <- e
+	}
+	close(jobs)
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var detailEntries []DetailEntry
+	for r := range results {
+		if r.valid {
+			detailEntries = append(detailEntries, r.entry)
+		}
+	}
+
+	// Sort by size descending
+	sortDetailEntries(detailEntries)
+
+	return detailEntries, nil
+}
+
+func sortDetailEntries(entries []DetailEntry) {
+	for i := 1; i < len(entries); i++ {
+		key := entries[i]
+		j := i - 1
+		for j >= 0 && entries[j].Size < key.Size {
+			entries[j+1] = entries[j]
+			j--
+		}
+		entries[j+1] = key
+	}
 }

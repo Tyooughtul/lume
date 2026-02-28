@@ -213,7 +213,7 @@ func (m BrowserDataView) View() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(PageHeader("🌐", "Browser Data", m.width))
+	b.WriteString(PageHeader("", "Browser Data", m.width))
 	b.WriteString("\n\n")
 
 	if m.scanning {
@@ -285,7 +285,7 @@ func (m BrowserDataView) View() string {
 
 	b.WriteString("\n\n")
 	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "↑↓", Desc: "navigate"},
+		{Key: "j/k", Desc: "navigate"},
 		{Key: "space", Desc: "toggle"},
 		{Key: "enter", Desc: "details"},
 		{Key: "a", Desc: "all"},

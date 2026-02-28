@@ -106,7 +106,7 @@ func (s *AppScanner) getAppVersion(appPath string) string {
 // findResiduals finds residual files for an app
 func (s *AppScanner) findResiduals(appName string) []ResidualInfo {
 	var residuals []ResidualInfo
-	homeDir, _ := os.UserHomeDir()
+	homeDir := GetRealHomeDir()
 
 	// Possible residual locations (comprehensive list)
 	locations := []string{

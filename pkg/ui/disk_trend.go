@@ -143,7 +143,7 @@ func (d *DiskTrend) View() string {
 
 	var b strings.Builder
 
-	b.WriteString(PageHeader("📊", "Activity Log", d.width))
+	b.WriteString(PageHeader("", "Activity Log", d.width))
 	b.WriteString("\n")
 
 	// Range tabs
@@ -182,10 +182,10 @@ func (d *DiskTrend) View() string {
 
 	b.WriteString("\n")
 	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "↑/k", Desc: "scroll"},
-		{Key: "↓/j", Desc: "scroll"},
-		{Key: "←/h", Desc: "prev"},
-		{Key: "→/l", Desc: "next"},
+		{Key: "k", Desc: "scroll up"},
+		{Key: "j", Desc: "scroll down"},
+		{Key: "h", Desc: "prev"},
+		{Key: "l", Desc: "next"},
 		{Key: "r", Desc: "refresh"},
 		{Key: "esc", Desc: "back"},
 	}))
@@ -245,8 +245,8 @@ func (d *DiskTrend) renderActivityLog() string {
 		Foreground(GrayColor).
 		Bold(true)
 	lines = append(lines, headerStyle.Render(
-		fmt.Sprintf("  %-19s │ %-12s │ %s", "Time", "Action", "Details")))
-	lines = append(lines, "  "+strings.Repeat("─", min(d.width-4, 70)))
+		fmt.Sprintf("  %-19s | %-12s | %s", "Time", "Action", "Details")))
+	lines = append(lines, "  "+strings.Repeat("-", min(d.width-4, 70)))
 
 	// Log entries
 	for i := startIdx; i < endIdx; i++ {
@@ -257,10 +257,10 @@ func (d *DiskTrend) renderActivityLog() string {
 
 	// Scroll indicator
 	if d.cursor > 0 {
-		lines = append([]string{DimStyle.Render("  ▲ more")}, lines...)
+		lines = append([]string{DimStyle.Render("  ^ more")}, lines...)
 	}
 	if endIdx < len(displaySnapshots) {
-		lines = append(lines, DimStyle.Render("  ▼ more"))
+		lines = append(lines, DimStyle.Render("  v more"))
 	}
 
 	return strings.Join(lines, "\n")
@@ -312,7 +312,7 @@ func (d *DiskTrend) renderChart() string {
 
 		for y := chartHeight - 1; y >= chartHeight-1-barHeight; y-- {
 			if y >= 0 && y < chartHeight {
-				chart[y][x] = "█"
+				chart[y][x] = "#"
 			}
 		}
 	}
@@ -324,7 +324,7 @@ func (d *DiskTrend) renderChart() string {
 		chartLines = append(chartLines, lipgloss.NewStyle().Foreground(GrayColor).Render(yAxis)+lipgloss.NewStyle().Foreground(PrimaryColor).Render(line))
 	}
 
-	xAxis := "      " + strings.Repeat("─", chartWidth)
+	xAxis := "      " + strings.Repeat("-", chartWidth)
 	chartLines = append(chartLines, lipgloss.NewStyle().Foreground(GrayColor).Render(xAxis))
 
 	if len(d.trendData.Labels) > 0 {
@@ -347,7 +347,7 @@ func (d *DiskTrend) formatLogEntry(s scanner.DiskSnapshot) string {
 	var action, details string
 
 	if s.CleanedSize > 0 {
-		action = lipgloss.NewStyle().Foreground(SecondaryColor).Render("🗑 CLEAN")
+		action = lipgloss.NewStyle().Foreground(SecondaryColor).Render("[CLEAN]")
 		sizeStr := humanize.Bytes(uint64(s.CleanedSize))
 		if s.Details != "" {
 			details = fmt.Sprintf("%s: %s", s.Details, sizeStr)
@@ -355,14 +355,14 @@ func (d *DiskTrend) formatLogEntry(s scanner.DiskSnapshot) string {
 			details = fmt.Sprintf("Reclaimed %s", sizeStr)
 		}
 	} else {
-		action = lipgloss.NewStyle().Foreground(PrimaryColor).Render("📊 SCAN")
+		action = lipgloss.NewStyle().Foreground(PrimaryColor).Render("[SCAN]")
 		// Use IBytes for binary units (GiB) to match df output
 		used := humanize.IBytes(s.UsedBytes)
 		free := humanize.IBytes(s.FreeBytes)
 		details = fmt.Sprintf("Used: %s | Free: %s", used, free)
 	}
 
-	return fmt.Sprintf("  %-19s │ %s │ %s",
+	return fmt.Sprintf("  %-19s | %s | %s",
 		DimStyle.Render(timeStr),
 		action,
 		details)
@@ -375,11 +375,20 @@ func (d *DiskTrend) renderStatistics() string {
 
 	var b strings.Builder
 
-	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(PrimaryColor).Render("📈 Summary"))
+	b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(PrimaryColor).Render("> Summary"))
 	b.WriteString("\n\n")
 
 	statsBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.Border{
+			Top:         "-",
+			Bottom:      "-",
+			Left:        "|",
+			Right:       "|",
+			TopLeft:     "+",
+			TopRight:    "+",
+			BottomLeft:  "+",
+			BottomRight: "+",
+		}).
 		BorderForeground(GrayColor).
 		Padding(1, 2).
 		Width(min(d.width-10, 70))
@@ -417,8 +426,8 @@ func (d *DiskTrend) renderDiskBar() string {
 	barWidth := min(d.width-20, 50)
 	usedWidth := int(float64(barWidth) * usedPercent / 100)
 
-	usedBar := lipgloss.NewStyle().Foreground(DangerColor).Render(strings.Repeat("█", usedWidth))
-	freeBar := lipgloss.NewStyle().Foreground(SecondaryColor).Render(strings.Repeat("█", barWidth-usedWidth))
+	usedBar := lipgloss.NewStyle().Foreground(DangerColor).Render(strings.Repeat("#", usedWidth))
+	freeBar := lipgloss.NewStyle().Foreground(SecondaryColor).Render(strings.Repeat("-", barWidth-usedWidth))
 
 	bar := usedBar + freeBar
 
@@ -428,7 +437,7 @@ func (d *DiskTrend) renderDiskBar() string {
 		usedPercent)
 
 	var b strings.Builder
-	b.WriteString(lipgloss.NewStyle().Bold(true).Render("💾 Disk Status"))
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render("> Disk Status"))
 	b.WriteString("\n")
 	b.WriteString(bar)
 	b.WriteString("\n")
@@ -491,7 +500,7 @@ func GetQuickStats() (string, error) {
 	}
 
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("📊 %d scans recorded", stats.TotalScans))
+	b.WriteString(fmt.Sprintf("[#] %d scans recorded", stats.TotalScans))
 	if stats.TotalCleanups > 0 {
 		b.WriteString(fmt.Sprintf(" | %s reclaimed", humanize.Bytes(uint64(stats.TotalCleaned))))
 	}

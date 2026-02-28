@@ -20,7 +20,7 @@ type Cleaner struct {
 
 // NewCleaner creates a new Cleaner instance
 func NewCleaner() *Cleaner {
-	homeDir, _ := os.UserHomeDir()
+	homeDir := scanner.GetRealHomeDir()
 	return &Cleaner{
 		trashPath: filepath.Join(homeDir, ".Trash"),
 	}

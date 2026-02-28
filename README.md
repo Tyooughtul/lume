@@ -173,8 +173,49 @@ lume -help        # Show help
 | `p` | Preview files |
 | `d` `c` | Clean selected (→ Trash) |
 | `r` | Refresh scan |
+| `t` | Toggle theme |
 | `Esc` | Back |
 | `q` | Quit |
+
+### Themes
+
+Lume supports multiple color themes. Press `t` to cycle through themes.
+
+**Built-in themes:**
+- `modern` (default) — Neon cyberpunk style
+- `retro` — Matrix green terminal
+- `amber` — Vintage amber monitor
+- `ocean` — Deep blue ocean
+- `highcontrast` — Accessibility friendly
+- `dracula` — Classic Dracula colors
+- `solarized` — Solarized Dark
+- `monokai` — Code editor style
+
+**Custom theme:**
+
+Create `~/.config/lume/themes/mytheme.json`:
+
+```json
+{
+  "name": "mytheme",
+  "description": "My custom theme",
+  "primary": "#ff6b6b",
+  "secondary": "#4ecdc4",
+  "accent": "#ffe66d",
+  "danger": "#ff4757",
+  "warning": "#ffa502",
+  "success": "#2ed573",
+  "foreground": "#f1f2f6",
+  "gray": "#747d8c",
+  "light_gray": "#a4b0be",
+  "dim": "#57606f",
+  "selected_bg": "#3742fa",
+  "selected_fg": "#ffffff",
+  "border": "#70a1ff"
+}
+```
+
+See [assets/custom_theme_example.json](assets/custom_theme_example.json) for a complete example.
 
 ---
 

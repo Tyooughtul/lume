@@ -233,7 +233,7 @@ func (m AppUninstallerView) View() string {
 
 	var b strings.Builder
 
-	b.WriteString(PageHeader("📦", "App Uninstaller", m.width))
+	b.WriteString(PageHeader("", "App Uninstaller", m.width))
 	b.WriteString("\n\n")
 
 	if m.scanning {
@@ -306,7 +306,7 @@ func (m AppUninstallerView) View() string {
 
 	b.WriteString("\n\n")
 	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "↑↓", Desc: "navigate"},
+		{Key: "j/k", Desc: "navigate"},
 		{Key: "enter/i", Desc: "info"},
 		{Key: "d", Desc: "uninstall"},
 		{Key: "r", Desc: "refresh"},
@@ -318,7 +318,7 @@ func (m AppUninstallerView) View() string {
 func (m AppUninstallerView) detailView() string {
 	var b strings.Builder
 
-	b.WriteString(PageHeader("📦", "App Details", m.width))
+	b.WriteString(PageHeader("", "App Details", m.width))
 	b.WriteString("\n\n")
 
 	if m.cursor < len(m.apps) {
@@ -329,7 +329,7 @@ func (m AppUninstallerView) detailView() string {
 		b.WriteString(fmt.Sprintf("Size: %s\n", humanize.Bytes(uint64(app.Size))))
 
 		b.WriteString("\n")
-		b.WriteString(WarningStyle.Render("⚠ This will delete the app and all its data"))
+		b.WriteString(WarningStyle.Render("[!] This will delete the app and all its data"))
 		b.WriteString("\n\n")
 		b.WriteString(StyledHelpBar([]KeyHelp{
 			{Key: "d/u", Desc: "uninstall"},

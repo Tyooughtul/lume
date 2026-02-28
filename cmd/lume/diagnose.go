@@ -13,16 +13,41 @@ import (
 	"github.com/Tyooughtul/lume/pkg/scanner"
 )
 
+// ANSI color helpers for diagnose output
+const (
+	colorReset  = "\033[0m"
+	colorRed    = "\033[31m"
+	colorGreen  = "\033[32m"
+	colorYellow = "\033[33m"
+	colorCyan   = "\033[36m"
+	colorDim    = "\033[2m"
+	colorBold   = "\033[1m"
+)
+
+// sizeTag returns a colored severity indicator for a given size
+func sizeTag(size int64, canClean bool) string {
+	if !canClean {
+		return colorDim + "[L]" + colorReset
+	}
+	if size > 1024*1024*1024 {
+		return colorRed + colorBold + "[!]" + colorReset
+	}
+	if size > 100*1024*1024 {
+		return colorYellow + "[~]" + colorReset
+	}
+	return colorGreen + "[+]" + colorReset
+}
+
 func diagnose() {
 	fmt.Println("╔════════════════════════════════════════════════════════════╗")
 	fmt.Println("║             Lume - Disk Space Diagnostic Tool               ║")
 	fmt.Println("╚════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
-	homeDir, _ := os.UserHomeDir()
+	homeDir := scanner.GetRealHomeDir()
 
 	// 1. Quick analysis of main directories
-	fmt.Println("📊 Analyzing main directories...")
+	fmt.Println("[*] Analyzing main directories...")
 	fmt.Println()
 
 	keyDirs := []struct {
@@ -71,22 +96,23 @@ func diagnose() {
 	})
 
 	for _, r := range results {
+		tag := sizeTag(r.size, true)
 		sizeStr := humanize.Bytes(uint64(r.size))
-		if r.size > 1024*1024*1024 {
-			sizeStr = "🔴 " + sizeStr
-		} else if r.size > 100*1024*1024 {
-			sizeStr = "🟡 " + sizeStr
-		} else {
-			sizeStr = "🟢 " + sizeStr
+		// pad manually: tag has ANSI codes, so use fixed field for the visible part
+		visible := fmt.Sprintf("%s %s", tag, sizeStr)
+		// ANSI codes don't take visual space; right-align within 17 char column
+		pad := 17 - (3 + 1 + len(sizeStr)) // [!] + space + size
+		if pad < 0 {
+			pad = 0
 		}
-		fmt.Printf("│ %-39s │ %17s │\n", r.name, sizeStr)
+		fmt.Printf("│ %-39s │ %s%s │\n", r.name, strings.Repeat(" ", pad), visible)
 	}
 
 	fmt.Println("└─────────────────────────────────────────┴───────────────────┘")
 	fmt.Println()
 
 	// 2. Detailed scan of junk directories
-	fmt.Println("🗑  Scanning junk file directories...")
+	fmt.Println("[*] Scanning junk file directories...")
 	fmt.Println()
 
 	junkScanner := scanner.NewEnhancedJunkScanner()
@@ -134,14 +160,14 @@ func diagnose() {
 			name = name[:36] + "..."
 		}
 
+		tag := sizeTag(target.Size, true)
 		sizeStr := humanize.Bytes(uint64(target.Size))
-		if target.Size > 1024*1024*1024 {
-			sizeStr = "🔴 " + sizeStr
-		} else if target.Size > 100*1024*1024 {
-			sizeStr = "🟡 " + sizeStr
+		pad := 17 - (3 + 1 + len(sizeStr))
+		if pad < 0 {
+			pad = 0
 		}
-
-		fmt.Printf("│ %-39s │ %17s │\n", name, sizeStr)
+		visible := fmt.Sprintf("%s %s", tag, sizeStr)
+		fmt.Printf("│ %-39s │ %s%s │\n", name, strings.Repeat(" ", pad), visible)
 	}
 
 	fmt.Println("└─────────────────────────────────────────┴───────────────────┘")
@@ -154,12 +180,12 @@ func diagnose() {
 	}
 
 	fmt.Println("═════════════════════════════════════════════════════════════")
-	fmt.Printf("💾 Total reclaimable space: %s\n", humanize.Bytes(uint64(totalJunk)))
+	fmt.Printf("[Total] Reclaimable space: %s\n", humanize.Bytes(uint64(totalJunk)))
 	fmt.Println("═════════════════════════════════════════════════════════════")
 	fmt.Println()
 
 	// 4. System Data Analysis
-	fmt.Println("🔍 Analyzing System Data (hidden space usage)...")
+	fmt.Println("[*] Analyzing System Data (hidden space usage)...")
 	fmt.Println()
 
 	systemScanner := scanner.NewSystemDataScanner()
@@ -182,16 +208,14 @@ func diagnose() {
 				name = name[:36] + "..."
 			}
 
+			tag := sizeTag(item.Size, item.CanClean)
 			sizeStr := humanize.Bytes(uint64(item.Size))
-			if !item.CanClean {
-				sizeStr = "🔒 " + sizeStr
-			} else if item.Size > 1024*1024*1024 {
-				sizeStr = "🔴 " + sizeStr
-			} else if item.Size > 100*1024*1024 {
-				sizeStr = "🟡 " + sizeStr
+			pad := 17 - (3 + 1 + len(sizeStr))
+			if pad < 0 {
+				pad = 0
 			}
-
-			fmt.Printf("│ %-39s │ %17s │\n", name, sizeStr)
+			visible := fmt.Sprintf("%s %s", tag, sizeStr)
+			fmt.Printf("│ %-39s │ %s%s │\n", name, strings.Repeat(" ", pad), visible)
 		}
 
 		fmt.Println("└─────────────────────────────────────────┴───────────────────┘")
@@ -199,14 +223,14 @@ func diagnose() {
 
 		totalSystem := systemScanner.GetTotalSize()
 		cleanableSystem := systemScanner.GetCleanableSize()
-		fmt.Printf("💾 Total System Data: %s\n", humanize.Bytes(uint64(totalSystem)))
-		fmt.Printf("✅ Cleanable System Data: %s\n", humanize.Bytes(uint64(cleanableSystem)))
+		fmt.Printf("[Total] System Data: %s\n", humanize.Bytes(uint64(totalSystem)))
+		fmt.Printf("[OK] Cleanable System Data: %s\n", humanize.Bytes(uint64(cleanableSystem)))
 		fmt.Println()
 	}
 
 	// 5. Show scan errors if any
 	if errs := junkScanner.GetErrors(); len(errs) > 0 {
-		fmt.Printf("⚠️  %d warnings during scan (usually permission issues):\n", len(errs))
+		fmt.Printf("[!] %d warnings during scan (usually permission issues):\n", len(errs))
 		for i, err := range errs {
 			if i >= 5 {
 				fmt.Printf("  ... and %d more\n", len(errs)-5)
@@ -218,12 +242,12 @@ func diagnose() {
 	}
 
 	// 6. Tips
-	fmt.Println("💡 Tips:")
+	fmt.Println("[Tips]:")
 	fmt.Println("  1. If some directories show 'No access', try running with sudo")
-	fmt.Println("  2. For 🔴 large directories, use TUI mode to view details")
+	fmt.Printf("  2. For %s%s[!]%s large directories, use TUI mode to view details\n", colorRed, colorBold, colorReset)
 	fmt.Println("  3. Docker data is usually in ~/Library/Containers/com.docker.docker")
 	fmt.Println("  4. Xcode cache can be very large, DerivedData is safe to clean")
-	fmt.Println("  5. 🔒 items are system data that cannot be safely cleaned")
+	fmt.Printf("  5. %s[L]%s items are system data that cannot be safely cleaned\n", colorDim, colorReset)
 	fmt.Println("  6. Time Machine snapshots are automatically managed by macOS")
 	fmt.Println("  7. System swap files are automatically managed by the OS")
 	fmt.Println()

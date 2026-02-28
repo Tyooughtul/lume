@@ -74,12 +74,12 @@ func (s *BrowserScanner) Scan(progressCh chan<- string) ([]BrowserDataInfo, erro
 
 // scanSafari scans Safari data.
 func (s *BrowserScanner) scanSafari() *BrowserDataInfo {
-	homeDir, _ := os.UserHomeDir()
+	homeDir := GetRealHomeDir()
 
 	info := &BrowserDataInfo{
 		Name: "Safari",
 		Type: Safari,
-		Icon: "🧭",
+		Icon: "[SF]",
 	}
 
 	// Safari cache
@@ -127,12 +127,12 @@ func (s *BrowserScanner) scanSafari() *BrowserDataInfo {
 
 // scanChrome scans Chrome data.
 func (s *BrowserScanner) scanChrome() *BrowserDataInfo {
-	homeDir, _ := os.UserHomeDir()
+	homeDir := GetRealHomeDir()
 
 	info := &BrowserDataInfo{
 		Name: "Google Chrome",
 		Type: Chrome,
-		Icon: "🌐",
+		Icon: "[CH]",
 	}
 
 	basePath := filepath.Join(homeDir, "Library", "Application Support", "Google", "Chrome")
@@ -195,12 +195,12 @@ func (s *BrowserScanner) scanChrome() *BrowserDataInfo {
 
 // scanFirefox scans Firefox data.
 func (s *BrowserScanner) scanFirefox() *BrowserDataInfo {
-	homeDir, _ := os.UserHomeDir()
+	homeDir := GetRealHomeDir()
 
 	info := &BrowserDataInfo{
 		Name: "Firefox",
 		Type: Firefox,
-		Icon: "🦊",
+		Icon: "[FF]",
 	}
 
 	basePath := filepath.Join(homeDir, "Library", "Application Support", "Firefox", "Profiles")
@@ -252,12 +252,12 @@ func (s *BrowserScanner) scanFirefox() *BrowserDataInfo {
 
 // scanEdge scans Edge data.
 func (s *BrowserScanner) scanEdge() *BrowserDataInfo {
-	homeDir, _ := os.UserHomeDir()
+	homeDir := GetRealHomeDir()
 
 	info := &BrowserDataInfo{
 		Name: "Microsoft Edge",
 		Type: Edge,
-		Icon: "🌊",
+		Icon: "[ED]",
 	}
 
 	basePath := filepath.Join(homeDir, "Library", "Application Support", "Microsoft Edge")

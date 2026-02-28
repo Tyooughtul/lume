@@ -21,6 +21,7 @@ var (
 	AccentColor    = lipgloss.Color("#d787ff") // Purple accent
 	DangerColor    = lipgloss.Color("#ff5f87") // Red
 	WarningColor   = lipgloss.Color("#ffd75f") // Yellow
+	SuccessColor   = lipgloss.Color("#5fd787") // Green
 	GrayColor      = lipgloss.Color("#6b7280") // Mid gray
 	LightGrayColor = lipgloss.Color("#9ca3af") // Light gray
 	DimColor       = lipgloss.Color("#4e4e4e") // Very dim
@@ -71,7 +72,16 @@ var (
 			Bold(true)
 
 	InfoBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
+			Border(lipgloss.Border{
+				Top:         "-",
+				Bottom:      "-",
+				Left:        "|",
+				Right:       "|",
+				TopLeft:     "+",
+				TopRight:    "+",
+				BottomLeft:  "+",
+				BottomRight: "+",
+			}).
 			BorderForeground(GrayColor).
 			Padding(0, 1)
 )
@@ -107,7 +117,7 @@ func Logo() string {
 	brand := lipgloss.NewStyle().
 		Foreground(PrimaryColor).
 		Bold(true).
-		Render("🧹 " + AppName)
+		Render("[#] " + AppName)
 	version := lipgloss.NewStyle().
 		Foreground(DimColor).
 		Render(" " + AppVersion)
@@ -119,7 +129,13 @@ func Logo() string {
 
 // PageHeader renders a consistent page header with title and navigation hint
 func PageHeader(icon, title string, width int) string {
-	left := TitleStyle.Render(icon + "  " + title)
+	var headerText string
+	if icon != "" {
+		headerText = icon + "  " + title
+	} else {
+		headerText = title
+	}
+	left := TitleStyle.Render(headerText)
 	right := DimStyle.Render("[esc] back")
 	leftW := displayWidth(stripAnsi(left))
 	rightW := displayWidth(stripAnsi(right))
@@ -132,7 +148,7 @@ func PageHeader(icon, title string, width int) string {
 		gap = 2
 	}
 	header := left + strings.Repeat(" ", gap) + right
-	sep := DimStyle.Render(strings.Repeat("─", innerW))
+	sep := DimStyle.Render(strings.Repeat("-", innerW))
 	return header + "\n" + sep
 }
 
@@ -175,14 +191,14 @@ func ProgressBar(percent float64, width int, usedColor, freeColor lipgloss.Color
 	if filled < 0 {
 		filled = 0
 	}
-	used := lipgloss.NewStyle().Foreground(usedColor).Render(strings.Repeat("█", filled))
-	free := lipgloss.NewStyle().Foreground(freeColor).Render(strings.Repeat("░", width-filled))
+	used := lipgloss.NewStyle().Foreground(usedColor).Render(strings.Repeat("#", filled))
+	free := lipgloss.NewStyle().Foreground(freeColor).Render(strings.Repeat("-", width-filled))
 	return used + free
 }
 
 // StatsLine renders inline statistics separated by dim pipes
 func StatsLine(stats []string) string {
-	sep := DimStyle.Render(" │ ")
+	sep := DimStyle.Render(" | ")
 	return strings.Join(stats, sep)
 }
 
@@ -228,7 +244,7 @@ func CreateMenuItem(icon, name, desc string, selected bool, width int) string {
 	descStr := padRight(desc, 30)
 	line := fmt.Sprintf("%s%s %s", iconStr, nameStr, descStr)
 	if selected {
-		return SelectedScanItemStyle.Render("▶ " + line[2:])
+		return SelectedScanItemStyle.Render("> " + line[2:])
 	}
 	return ScanItemStyle.Render("  " + line)
 }
@@ -261,7 +277,7 @@ func TableHeader(columns []string, widths []int) string {
 
 // Divider creates a separator line
 func Divider(width int) string {
-	return DimStyle.Render(strings.Repeat("─", width))
+	return DimStyle.Render(strings.Repeat("-", width))
 }
 
 // StatsBar creates a statistics bar with border
@@ -284,18 +300,18 @@ func Center(width, height int, content string) string {
 // Checkbox returns a styled checkbox
 func Checkbox(checked bool) string {
 	if checked {
-		return lipgloss.NewStyle().Foreground(SecondaryColor).Render("◉")
+		return lipgloss.NewStyle().Foreground(SecondaryColor).Render("*")
 	}
-	return lipgloss.NewStyle().Foreground(GrayColor).Render("○")
+	return lipgloss.NewStyle().Foreground(GrayColor).Render(".")
 }
 
 // ScrollIndicator returns scroll direction hints
 func ScrollIndicator(offset, total, visible int) (above, below string) {
 	if offset > 0 {
-		above = DimStyle.Render(fmt.Sprintf("  ↑ %d more", offset))
+		above = DimStyle.Render(fmt.Sprintf("  ^ %d more", offset))
 	}
 	if offset+visible < total {
-		below = DimStyle.Render(fmt.Sprintf("  ↓ %d more", total-offset-visible))
+		below = DimStyle.Render(fmt.Sprintf("  v %d more", total-offset-visible))
 	}
 	return
 }
@@ -356,8 +372,22 @@ func displayWidth(s string) int {
 	return runewidth.StringWidth(s)
 }
 
+// displayWidthAnsi returns the visual width of a string that may contain ANSI escape codes
+func displayWidthAnsi(s string) int {
+	return runewidth.StringWidth(stripAnsi(s))
+}
+
 func padRight(s string, width int) string {
 	currentWidth := displayWidth(s)
+	if currentWidth >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-currentWidth)
+}
+
+// padRightAnsi pads a string that may contain ANSI escape codes
+func padRightAnsi(s string, width int) string {
+	currentWidth := displayWidthAnsi(s)
 	if currentWidth >= width {
 		return s
 	}

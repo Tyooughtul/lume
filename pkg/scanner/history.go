@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -37,9 +38,9 @@ type HistoryManager struct {
 
 // NewHistoryManager creates a history manager
 func NewHistoryManager() (*HistoryManager, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, err
+	homeDir := GetRealHomeDir()
+	if homeDir == "" {
+		return nil, fmt.Errorf("cannot determine home directory")
 	}
 
 	dataDir := filepath.Join(homeDir, ".config", "lume")

@@ -6,10 +6,24 @@ import (
 	"os"
 
 	"github.com/charmbracelet/bubbletea"
+	"github.com/mattn/go-runewidth"
+
 	"github.com/Tyooughtul/lume/pkg/ui"
 )
 
+func init() {
+	// Force EastAsianWidth=false so that ambiguous-width Unicode characters
+	// (●, ○, █, ─, │, etc.) are always treated as single-width.
+	// macOS Terminal.app renders these as 1 cell even under CJK locales,
+	// while go-runewidth auto-detects zh_CN → EAW=true → width=2, causing
+	// column misalignment. This makes behaviour consistent across terminals.
+	runewidth.DefaultCondition.EastAsianWidth = false
+}
+
 func main() {
+	// Initialize theme manager
+	ui.InitThemeManager()
+
 	diagnoseMode := flag.Bool("diagnose", false, "Run diagnostic mode (no TUI)")
 	helpMode := flag.Bool("help", false, "Show help information")
 	flag.Parse()

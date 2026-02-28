@@ -3,9 +3,57 @@ package scanner
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"os/user"
+	"strings"
 	"syscall"
 	"time"
 )
+
+// GetRealHomeDir returns the real user's home directory, even when running under sudo.
+// When sudo is used, os.UserHomeDir() returns /var/root which is not what we want.
+func GetRealHomeDir() string {
+	// Check if running under sudo
+	sudoUser := os.Getenv("SUDO_USER")
+	if sudoUser != "" {
+		// Try to lookup the original user's home directory
+		u, err := user.Lookup(sudoUser)
+		if err == nil && u.HomeDir != "" {
+			return u.HomeDir
+		}
+		// Fallback: try dscl on macOS
+		out, err := exec.Command("dscl", ".", "-read", "/Users/"+sudoUser, "NFSHomeDirectory").Output()
+		if err == nil {
+			for _, line := range strings.Split(string(out), "\n") {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "NFSHomeDirectory:") {
+					dir := strings.TrimSpace(strings.TrimPrefix(line, "NFSHomeDirectory:"))
+					if dir != "" {
+						return dir
+					}
+				}
+			}
+		}
+	}
+	// Default behavior
+	homeDir, _ := os.UserHomeDir()
+	return homeDir
+}
+
+// HasFullDiskAccess checks if the application has Full Disk Access permission on macOS.
+// This is done by attempting to access a protected directory (like .Trash).
+func HasFullDiskAccess() bool {
+	homeDir := GetRealHomeDir()
+	trashPath := homeDir + "/.Trash"
+	
+	// Try to list the directory - if we get "Operation not permitted", we don't have FDA
+	cmd := exec.Command("ls", "-la", trashPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil && strings.Contains(string(output), "Operation not permitted") {
+		return false
+	}
+	return true
+}
 
 // GetFileKey gets the unique file identifier (used for detecting hard links)
 func GetFileKey(info os.FileInfo) string {

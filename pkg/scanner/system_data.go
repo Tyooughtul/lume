@@ -36,7 +36,7 @@ func NewSystemDataScanner() *SystemDataScanner {
 
 // Scan scans system data
 func (s *SystemDataScanner) Scan() ([]SystemDataItem, error) {
-	homeDir, _ := os.UserHomeDir()
+	homeDir := GetRealHomeDir()
 
 	// 1. Time Machine local snapshots
 	s.scanTimeMachineSnapshots()

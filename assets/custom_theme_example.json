@@ -1,0 +1,17 @@
+{
+  "name": "mytheme",
+  "description": "My Custom Theme - 我的自定义主题",
+  "primary": "#ff6b6b",
+  "secondary": "#4ecdc4",
+  "accent": "#ffe66d",
+  "danger": "#ff4757",
+  "warning": "#ffa502",
+  "success": "#2ed573",
+  "foreground": "#f1f2f6",
+  "gray": "#747d8c",
+  "light_gray": "#a4b0be",
+  "dim": "#57606f",
+  "selected_bg": "#3742fa",
+  "selected_fg": "#ffffff",
+  "border": "#70a1ff"
+}
