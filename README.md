@@ -16,7 +16,9 @@
 
 <br>
 
-<img src="assets/demo1.png" alt="Lume Main Menu" width="700">
+<img src="assets/theme_demo.gif" alt="Lume Theme Switching" width="700">
+
+<p><i>Press <code>t</code> to cycle through 8+ themes</i></p>
 
 </div>
 
@@ -142,14 +144,19 @@ Per-browser, per-data-type control (cache, history, cookies) for Safari, Chrome,
 ---
 
 <details>
-<summary><b>📸 More Screenshots</b></summary>
+<summary><b>🎬 Demo GIFs</b></summary>
 <br>
+
+**System Junk Cleanup**
 <p align="center">
-  <img src="assets/demo2.png" alt="System Junk Scan" width="700">
+  <img src="assets/cleanup_demo.gif" alt="System Junk Cleanup" width="700">
 </p>
+
+**Diagnose Mode**
 <p align="center">
-  <img src="assets/trend.png" alt="Disk Trend" width="700">
+  <img src="assets/diagnose_demo.gif" alt="Diagnose Mode" width="700">
 </p>
+
 </details>
 
 ---
