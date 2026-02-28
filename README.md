@@ -16,9 +16,9 @@
 
 <br>
 
-<img src="assets/theme_demo.gif" alt="Lume Theme Switching" width="700">
+<img src="assets/cleanup_demo.gif" alt="Lume System Junk Cleanup" width="700">
 
-<p><i>Press <code>t</code> to cycle through 8+ themes</i></p>
+<p><i>Scan → Select → Clean to Trash — Safe & undoable</i></p>
 
 </div>
 
@@ -143,21 +143,7 @@ Per-browser, per-data-type control (cache, history, cookies) for Safari, Chrome,
 
 ---
 
-<details>
-<summary><b>🎬 Demo GIFs</b></summary>
-<br>
 
-**System Junk Cleanup**
-<p align="center">
-  <img src="assets/cleanup_demo.gif" alt="System Junk Cleanup" width="700">
-</p>
-
-**Diagnose Mode**
-<p align="center">
-  <img src="assets/diagnose_demo.gif" alt="Diagnose Mode" width="700">
-</p>
-
-</details>
 
 ---
 
@@ -168,6 +154,14 @@ lume              # Interactive TUI (recommended)
 lume -diagnose    # Quick terminal report, no interaction
 lume -help        # Show help
 ```
+
+### Diagnose Mode
+
+Quick terminal report without interaction — perfect for CI/CD or quick checks:
+
+<p align="center">
+  <img src="assets/diagnose_demo.gif" alt="Diagnose Mode" width="700">
+</p>
 
 ### Keyboard Shortcuts
 
@@ -189,14 +183,21 @@ lume -help        # Show help
 Lume supports multiple color themes. Press `t` to cycle through themes.
 
 **Built-in themes:**
-- `modern` (default) — Neon cyberpunk style
-- `retro` — Matrix green terminal
-- `amber` — Vintage amber monitor
-- `ocean` — Deep blue ocean
-- `highcontrast` — Accessibility friendly
-- `dracula` — Classic Dracula colors
-- `solarized` — Solarized Dark
-- `monokai` — Code editor style
+
+| Theme | Style |
+|-------|-------|
+| `modern` (default) | Neon cyberpunk |
+| `retro` | Matrix green terminal |
+| `amber` | Vintage amber monitor |
+| `ocean` | Deep blue ocean |
+| `highcontrast` | Accessibility friendly |
+| `dracula` | Classic Dracula colors |
+| `solarized` | Solarized Dark |
+| `monokai` | Code editor style |
+
+<p align="center">
+  <img src="assets/theme_demo.gif" alt="Theme Switching" width="600">
+</p>
 
 **Custom theme:**
 
