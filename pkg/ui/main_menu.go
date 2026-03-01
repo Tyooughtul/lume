@@ -29,6 +29,7 @@ const (
 	ViewDuplicates
 	ViewBrowserData
 	ViewDiskTrend
+	ViewZombieHunter
 )
 
 type MainMenu struct {
@@ -52,6 +53,7 @@ func NewMainMenu() *MainMenu {
 		items: []MenuItem{
 			{Name: "System Junk", Description: "Clean system cache and logs", Icon: "*", View: ViewSystemJunk},
 			{Name: "Large Files", Description: "Find large files", Icon: "*", View: ViewLargeFiles},
+			{Name: "Zombie Hunter", Description: "Find cold files", Icon: "*", View: ViewZombieHunter},
 			{Name: "App Uninstaller", Description: "Uninstall apps completely", Icon: "*", View: ViewAppUninstaller},
 			{Name: "Duplicate Files", Description: "Find duplicate files", Icon: "*", View: ViewDuplicates},
 			{Name: "Browser Data", Description: "Clean browser cache", Icon: "*", View: ViewBrowserData},

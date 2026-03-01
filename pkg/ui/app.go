@@ -12,6 +12,7 @@ type App struct {
 	mainMenu       *MainMenu
 	systemJunk     *SystemJunkViewEnhanced
 	largeFiles     *LargeFilesView
+	zombieHunter   *ZombieHunterView
 	appUninstall   *AppUninstallerView
 	duplicates     *DuplicatesView
 	browserData    *BrowserDataView
@@ -29,6 +30,7 @@ func NewApp() *App {
 		mainMenu:     NewMainMenu(),
 		systemJunk:   NewSystemJunkViewEnhanced(),
 		largeFiles:   NewLargeFilesView(),
+		zombieHunter: NewZombieHunterView(),
 		appUninstall: NewAppUninstallerView(),
 		duplicates:   NewDuplicatesView(),
 		browserData:  NewBrowserDataView(),
@@ -58,6 +60,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.systemJunk.height = msg.Height
 		a.largeFiles.width = msg.Width
 		a.largeFiles.height = msg.Height
+		a.zombieHunter.width = msg.Width
+		a.zombieHunter.height = msg.Height
 		a.appUninstall.width = msg.Width
 		a.appUninstall.height = msg.Height
 		a.duplicates.width = msg.Width
@@ -97,6 +101,8 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return a, a.systemJunk.Init()
 		case ViewLargeFiles:
 			return a, a.largeFiles.Init()
+		case ViewZombieHunter:
+			return a, a.zombieHunter.Init()
 		case ViewAppUninstaller:
 			return a, a.appUninstall.Init()
 		case ViewDuplicates:
@@ -130,6 +136,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		model, cmd := a.largeFiles.Update(msg)
 		if updated, ok := model.(*LargeFilesView); ok {
 			a.largeFiles = updated
+		}
+		return a, cmd
+
+	case ViewZombieHunter:
+		model, cmd := a.zombieHunter.Update(msg)
+		if updated, ok := model.(*ZombieHunterView); ok {
+			a.zombieHunter = updated
 		}
 		return a, cmd
 
@@ -182,6 +195,8 @@ func (a App) View() string {
 		content = a.systemJunk.View()
 	case ViewLargeFiles:
 		content = a.largeFiles.View()
+	case ViewZombieHunter:
+		content = a.zombieHunter.View()
 	case ViewAppUninstaller:
 		content = a.appUninstall.View()
 	case ViewDuplicates:

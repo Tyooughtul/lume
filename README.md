@@ -116,6 +116,24 @@ All scanning runs concurrently (`NumCPU` workers, max 8) — completes in second
 
 **100 GB in ~10 seconds** on Apple Silicon · Up to 8 concurrent hashers · 256KB I/O buffer · Zero false positives
 
+### 🧟 Zombie Hunter — Find Cold Files
+
+**File access time heatmap** — Visualize which files are actually being used:
+
+```
+[>] Last 7 days         ████████████████████░░░░░  25% (12 GB)
+[+] Last 30 days        ██████████████░░░░░░░░░░░  18% (8.5 GB)
+[~] Last 90 days        ████████░░░░░░░░░░░░░░░░░  10% (4.2 GB)
+[-] Last year           ██████░░░░░░░░░░░░░░░░░░░   7% (3.1 GB)
+[x] Zombie files (>1y)  ███████████████░░░░░░░░░░  40% (20 GB) <-- Clean these!
+```
+
+- **Visual heatmap** of file access patterns
+- **Zombie file detection** — files untouched for >1 year
+- **Hot file tracking** — recently accessed large files
+- **Size filters** — 10MB / 50MB / 100MB / 500MB thresholds
+- **Perfect for** finding forgotten downloads and old projects
+
 ### 📦 App Uninstaller — 95%+ Residual Detection
 
 Scans **11 Library directories** with **6 keyword variants** per app:
