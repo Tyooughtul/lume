@@ -25,8 +25,14 @@ func main() {
 	ui.InitThemeManager()
 
 	diagnoseMode := flag.Bool("diagnose", false, "Run diagnostic mode (no TUI)")
+	versionMode := flag.Bool("version", false, "Show version information")
 	helpMode := flag.Bool("help", false, "Show help information")
 	flag.Parse()
+
+	if *versionMode {
+		fmt.Printf("Lume %s\n", ui.AppVersion)
+		os.Exit(0)
+	}
 
 	if *helpMode {
 		fmt.Println("Lume - macOS Disk Cleanup Tool")
@@ -34,6 +40,7 @@ func main() {
 		fmt.Println("Usage:")
 		fmt.Println("  lume              Start TUI interface")
 		fmt.Println("  lume -diagnose    Run diagnostic mode")
+		fmt.Println("  lume -version     Show version")
 		fmt.Println("  lume -help        Show help")
 		fmt.Println()
 		fmt.Println("TUI Key Bindings:")

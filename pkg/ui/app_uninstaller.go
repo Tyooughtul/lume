@@ -22,6 +22,7 @@ type AppUninstallerView struct {
 	scrollOffset int
 	scanning     bool
 	uninstalling bool
+	confirming   bool
 	showDetail   bool
 	spinner      spinner.Model
 	width        int
@@ -65,8 +66,9 @@ func (m *AppUninstallerView) startScan() tea.Cmd {
 	m.apps = []scanner.AppInfo{}
 
 	go func() {
-		apps := m.scanApps()
-		m.resultCh <- appScanResult{apps: apps, err: nil}
+		s := scanner.NewAppScanner()
+		apps, err := s.Scan(nil)
+		m.resultCh <- appScanResult{apps: apps, err: err}
 	}()
 
 	return func() tea.Msg {
@@ -118,6 +120,17 @@ func (m *AppUninstallerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateScrollOffset()
 
 	case tea.KeyMsg:
+		if m.confirming {
+			switch msg.String() {
+			case "y", "Y":
+				m.confirming = false
+				return m, m.startUninstall()
+			case "n", "N", "esc":
+				m.confirming = false
+			}
+			return m, nil
+		}
+
 		if m.scanning || m.uninstalling {
 			switch msg.String() {
 			case "q", "ctrl+c":
@@ -132,6 +145,11 @@ func (m *AppUninstallerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc", "i", "enter":
 				m.showDetail = false
+			case "d", "u":
+				if len(m.apps) > 0 {
+					m.confirming = true
+					m.showDetail = false
+				}
 			}
 			return m, nil
 		}
@@ -157,7 +175,7 @@ func (m *AppUninstallerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "d", "u":
 			if len(m.apps) > 0 {
-				return m, m.startUninstall()
+				m.confirming = true
 			}
 		case "r":
 			return m, m.startScan()
@@ -305,12 +323,28 @@ func (m AppUninstallerView) View() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "j/k", Desc: "navigate"},
-		{Key: "enter/i", Desc: "info"},
-		{Key: "d", Desc: "uninstall"},
-		{Key: "r", Desc: "refresh"},
-	}))
+	if m.confirming && m.cursor < len(m.apps) {
+		app := m.apps[m.cursor]
+		residualSize := scanner.GetTotalResidualSize(app)
+		totalSize := app.Size + residualSize
+		residualInfo := ""
+		if len(app.Residuals) > 0 {
+			residualInfo = fmt.Sprintf(" + %d residuals", len(app.Residuals))
+		}
+		b.WriteString("  " + WarningStyle.Render(fmt.Sprintf("Uninstall %s (%s%s) to Trash?", app.Name, humanize.Bytes(uint64(totalSize)), residualInfo)))
+		b.WriteString("\n\n")
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "y", Desc: "confirm"},
+			{Key: "n/esc", Desc: "cancel"},
+		}))
+	} else {
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "enter/i", Desc: "info"},
+			{Key: "d", Desc: "uninstall"},
+			{Key: "r", Desc: "refresh"},
+		}))
+	}
 
 	return Center(m.width, m.height, b.String())
 }
@@ -324,12 +358,36 @@ func (m AppUninstallerView) detailView() string {
 	if m.cursor < len(m.apps) {
 		app := m.apps[m.cursor]
 
-		b.WriteString(fmt.Sprintf("Name: %s\n", app.Name))
-		b.WriteString(fmt.Sprintf("Path: %s\n", app.Path))
-		b.WriteString(fmt.Sprintf("Size: %s\n", humanize.Bytes(uint64(app.Size))))
+		b.WriteString(fmt.Sprintf("  Name: %s\n", app.Name))
+		b.WriteString(fmt.Sprintf("  Path: %s\n", app.Path))
+		b.WriteString(fmt.Sprintf("  Size: %s\n", humanize.Bytes(uint64(app.Size))))
+		if app.Version != "" {
+			b.WriteString(fmt.Sprintf("  Version: %s\n", app.Version))
+		}
+
+		// Show residual files
+		if len(app.Residuals) > 0 {
+			residualSize := scanner.GetTotalResidualSize(app)
+			b.WriteString("\n")
+			b.WriteString(fmt.Sprintf("  Residual Files (%d locations, %s):\n", len(app.Residuals), humanize.Bytes(uint64(residualSize))))
+			for i, r := range app.Residuals {
+				if i >= 10 {
+					b.WriteString(fmt.Sprintf("    ... and %d more\n", len(app.Residuals)-10))
+					break
+				}
+				shortPath := r.Path
+				if len(shortPath) > 55 {
+					shortPath = "..." + shortPath[len(shortPath)-52:]
+				}
+				b.WriteString(fmt.Sprintf("    %s (%s)\n", shortPath, humanize.Bytes(uint64(r.Size))))
+			}
+		} else {
+			b.WriteString("\n")
+			b.WriteString("  No residual files found.\n")
+		}
 
 		b.WriteString("\n")
-		b.WriteString(WarningStyle.Render("[!] This will delete the app and all its data"))
+		b.WriteString("  " + SuccessStyle.Render("[i] App and data will be moved to Trash (recoverable)"))
 		b.WriteString("\n\n")
 		b.WriteString(StyledHelpBar([]KeyHelp{
 			{Key: "d/u", Desc: "uninstall"},

@@ -5,12 +5,23 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
 )
+
+// GarbageTruckTickMsg 垃圾车动画 tick
+type GarbageTruckTickMsg struct{}
+
+// GarbageTruckTick 返回垃圾车动画 tick 命令
+func GarbageTruckTick() tea.Cmd {
+	return tea.Tick(120*time.Millisecond, func(t time.Time) tea.Msg {
+		return GarbageTruckTickMsg{}
+	})
+}
 
 type MenuItem struct {
 	Name        string
@@ -42,6 +53,9 @@ type MainMenu struct {
 	height     int
 	err        error
 	ThemeNotif string // transient theme-switch notification
+	
+	// 垃圾车 idle 动画
+	garbageTruck *GarbageTruckAnimation
 }
 
 func NewMainMenu() *MainMenu {
@@ -59,7 +73,8 @@ func NewMainMenu() *MainMenu {
 			{Name: "Browser Data", Description: "Clean browser cache", Icon: "*", View: ViewBrowserData},
 			{Name: "Disk Trend", Description: "View disk usage history", Icon: "*", View: ViewDiskTrend},
 		},
-		spinner: s,
+		spinner:      s,
+		garbageTruck: NewGarbageTruckAnimation(),
 	}
 }
 
@@ -67,6 +82,7 @@ func (m MainMenu) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		getDiskInfo(),
+		GarbageTruckTick(),
 	)
 }
 
@@ -97,6 +113,10 @@ func (m *MainMenu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case diskInfoMsg:
 		m.diskTotal = msg.total
 		m.diskUsed = msg.used
+	
+	case GarbageTruckTickMsg:
+		m.garbageTruck.Update()
+		return m, GarbageTruckTick()
 	}
 
 	var cmd tea.Cmd
@@ -167,6 +187,16 @@ func (m MainMenu) View() string {
 	if m.diskTotal > 0 {
 		b.WriteString(m.renderDiskBar())
 		b.WriteString("\n")
+	}
+
+	// 垃圾车 idle 动画
+	if m.width >= 60 {
+		b.WriteString("\n")
+		truckAnim := m.garbageTruck.Draw(m.width - 4)
+		if truckAnim != "" {
+			b.WriteString(truckAnim)
+			b.WriteString("\n")
+		}
 	}
 
 	b.WriteString("\n")

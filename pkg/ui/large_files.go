@@ -23,6 +23,7 @@ type LargeFilesView struct {
 	scrollOffset int
 	scanning     bool
 	cleaning     bool
+	confirming   bool
 	spinner      spinner.Model
 	width        int
 	height       int
@@ -48,7 +49,7 @@ func NewLargeFilesView() *LargeFilesView {
 
 	return &LargeFilesView{
 		spinner:  s,
-		rootPath: filepath.Join(homeDir, "Downloads"),
+		rootPath: homeDir,
 		minSize:  50 * 1024 * 1024,
 		resultCh: make(chan largeScanResult, 1),
 		selected: make(map[int]bool),
@@ -80,10 +81,14 @@ func (m *LargeFilesView) startScan() tea.Cmd {
 func (m *LargeFilesView) scanWithFind() []scanner.FileInfo {
 	var results []scanner.FileInfo
 
-	cmd := exec.Command("find", m.rootPath, "-type", "f", "-size", "+50M", "-exec", "ls", "-ln", "{}", "+")
+	sizeArg := fmt.Sprintf("+%dc", m.minSize)
+	cmd := exec.Command("find", m.rootPath, "-not", "-path", "*/.Trash/*", "-type", "f", "-size", sizeArg, "-exec", "ls", "-ln", "{}", "+")
 	output, err := cmd.Output()
 	if err != nil {
-		return results
+		if len(output) == 0 {
+			return results
+		}
+		// Partial results from permission errors, continue
 	}
 
 	lines := strings.Split(string(output), "\n")
@@ -121,6 +126,17 @@ func (m *LargeFilesView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateScrollOffset()
 
 	case tea.KeyMsg:
+		if m.confirming {
+			switch msg.String() {
+			case "y", "Y":
+				m.confirming = false
+				return m, m.startClean()
+			case "n", "N", "esc":
+				m.confirming = false
+			}
+			return m, nil
+		}
+
 		if m.scanning || m.cleaning {
 			switch msg.String() {
 			case "q", "ctrl+c":
@@ -159,7 +175,16 @@ func (m *LargeFilesView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "d", "c":
-			return m, m.startClean()
+			hasSelected := false
+			for _, v := range m.selected {
+				if v {
+					hasSelected = true
+					break
+				}
+			}
+			if hasSelected {
+				m.confirming = true
+			}
 		case "r":
 			return m, m.startScan()
 		}
@@ -241,7 +266,7 @@ func (m LargeFilesView) View() string {
 	b.WriteString(PageHeader("", "Large Files", m.width))
 	b.WriteString("\n")
 	b.WriteString("  ")
-	b.WriteString(DimStyle.Render(fmt.Sprintf("Scanning: %s (>50MB)", m.rootPath)))
+	b.WriteString(DimStyle.Render(fmt.Sprintf("Scanning: %s (>%s)", m.rootPath, humanize.Bytes(uint64(m.minSize)))))
 	b.WriteString("\n\n")
 
 	if m.scanning {
@@ -265,8 +290,8 @@ func (m LargeFilesView) View() string {
 	}
 
 	if len(m.files) == 0 {
-		b.WriteString("  No files larger than 50MB found.\n")
-		b.WriteString("\n  Your downloads folder is clean!\n")
+		b.WriteString(fmt.Sprintf("  No files larger than %s found.\n", humanize.Bytes(uint64(m.minSize))))
+		b.WriteString("\n  Your home directory is clean!\n")
 	} else {
 		b.WriteString("  ")
 		b.WriteString(TableHeader([]string{"", "Filename", "Size"}, []int{3, 36, 12}))
@@ -331,13 +356,30 @@ func (m LargeFilesView) View() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "j/k", Desc: "navigate"},
-		{Key: "space", Desc: "toggle"},
-		{Key: "a", Desc: "all"},
-		{Key: "d", Desc: "delete"},
-		{Key: "r", Desc: "refresh"},
-	}))
+	if m.confirming {
+		selectedSize := int64(0)
+		selectedCount := 0
+		for i, file := range m.files {
+			if m.selected[i] {
+				selectedSize += file.Size
+				selectedCount++
+			}
+		}
+		b.WriteString("  " + WarningStyle.Render(fmt.Sprintf("Move %d files (%s) to Trash?", selectedCount, humanize.Bytes(uint64(selectedSize)))))
+		b.WriteString("\n\n")
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "y", Desc: "confirm"},
+			{Key: "n/esc", Desc: "cancel"},
+		}))
+	} else {
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "space", Desc: "toggle"},
+			{Key: "a", Desc: "all"},
+			{Key: "d", Desc: "delete"},
+			{Key: "r", Desc: "refresh"},
+		}))
+	}
 
 	return Center(m.width, m.height, b.String())
 }

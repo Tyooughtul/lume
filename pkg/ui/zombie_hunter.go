@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
 
+	"github.com/Tyooughtul/lume/pkg/cleaner"
 	"github.com/Tyooughtul/lume/pkg/scanner"
 )
 
@@ -20,14 +21,19 @@ type ZombieHunterView struct {
 	cursor       int
 	scrollOffset int
 	scanning     bool
+	cleaning     bool
+	confirming   bool
 	width        int
 	height       int
 	spinner      spinner.Model
 	rootPath     string
 	minSize      int64
 	resultCh     chan zombieResult
+	cleanCh      chan cleanResultMsg
 	err          error
 	selectedTab  int // 0=Heatmap, 1=Zombie Files, 2=Hot Files
+	selected     map[int]bool
+	cleanedSize  int64
 }
 
 type zombieResult struct {
@@ -47,8 +53,8 @@ type heatmapBlock struct {
 
 func NewZombieHunterView() *ZombieHunterView {
 	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(PrimaryColor)
+	s.Spinner = spinner.MiniDot
+	s.Style = lipgloss.NewStyle().Foreground(AccentColor)
 
 	homeDir := scanner.GetRealHomeDir()
 
@@ -57,7 +63,9 @@ func NewZombieHunterView() *ZombieHunterView {
 		rootPath:    homeDir,
 		minSize:     10 * 1024 * 1024, // 10MB default
 		resultCh:    make(chan zombieResult, 1),
+		cleanCh:     make(chan cleanResultMsg, 1),
 		selectedTab: 0,
+		selected:    make(map[int]bool),
 	}
 }
 
@@ -84,6 +92,33 @@ func (m *ZombieHunterView) startScan() tea.Cmd {
 	}
 }
 
+func (m *ZombieHunterView) startClean() tea.Cmd {
+	m.cleaning = true
+
+	go func() {
+		c := cleaner.NewCleaner()
+		var files []scanner.FileInfo
+		if stat, ok := m.result.Stats[scanner.RangeZombie]; ok {
+			for i, f := range stat.Files {
+				if m.selected[i] {
+					files = append(files, scanner.FileInfo{
+						Path: f.Path,
+						Name: f.Name,
+						Size: f.Size,
+					})
+				}
+			}
+		}
+		size, err := c.CleanFiles(files, nil)
+		details := fmt.Sprintf("%d zombie files", len(files))
+		m.cleanCh <- cleanResultMsg{size: size, err: err, details: details}
+	}()
+
+	return func() tea.Msg {
+		return <-m.cleanCh
+	}
+}
+
 func (m *ZombieHunterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -92,7 +127,18 @@ func (m *ZombieHunterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateScrollOffset()
 
 	case tea.KeyMsg:
-		if m.scanning {
+		if m.confirming {
+			switch msg.String() {
+			case "y", "Y":
+				m.confirming = false
+				return m, m.startClean()
+			case "n", "N", "esc":
+				m.confirming = false
+			}
+			return m, nil
+		}
+
+		if m.scanning || m.cleaning {
 			switch msg.String() {
 			case "q", "ctrl+c":
 				return m, tea.Quit
@@ -126,19 +172,59 @@ func (m *ZombieHunterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor++
 			}
 			m.updateScrollOffset()
+		case " ":
+			if m.selectedTab == 1 { // Zombie Files tab
+				m.selected[m.cursor] = !m.selected[m.cursor]
+			}
+		case "a":
+			if m.selectedTab == 1 {
+				if stat, ok := m.result.Stats[scanner.RangeZombie]; ok {
+					allSelected := true
+					for i := range stat.Files {
+						if !m.selected[i] {
+							allSelected = false
+							break
+						}
+					}
+					m.selected = make(map[int]bool)
+					if !allSelected {
+						for i := range stat.Files {
+							m.selected[i] = true
+						}
+					}
+				}
+			}
+		case "d", "c":
+			if m.selectedTab == 1 {
+				hasSelected := false
+				for _, v := range m.selected {
+					if v {
+						hasSelected = true
+						break
+					}
+				}
+				if hasSelected {
+					m.confirming = true
+				}
+			}
 		case "r":
+			m.selected = make(map[int]bool)
 			return m, m.startScan()
 		case "1":
 			m.minSize = 10 * 1024 * 1024
+			m.selected = make(map[int]bool)
 			return m, m.startScan()
 		case "2":
 			m.minSize = 50 * 1024 * 1024
+			m.selected = make(map[int]bool)
 			return m, m.startScan()
 		case "3":
 			m.minSize = 100 * 1024 * 1024
+			m.selected = make(map[int]bool)
 			return m, m.startScan()
 		case "4":
 			m.minSize = 500 * 1024 * 1024
+			m.selected = make(map[int]bool)
 			return m, m.startScan()
 		}
 
@@ -148,6 +234,17 @@ func (m *ZombieHunterView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.err
 		m.cursor = 0
 		m.scrollOffset = 0
+		m.selected = make(map[int]bool)
+
+	case cleanResultMsg:
+		m.cleaning = false
+		m.err = msg.err
+		if msg.size > 0 {
+			m.cleanedSize = msg.size
+			m.selected = make(map[int]bool)
+			return m, tea.Batch(m.startScan(), RecordSnapshot(0, 0, msg.size, "zombie_hunter", msg.details))
+		}
+		return m, m.startScan()
 
 	case BackToMenuMsg:
 		return NewMainMenu(), nil
@@ -217,10 +314,38 @@ func (m *ZombieHunterView) View() string {
 	b.WriteString("\n")
 
 	if m.scanning {
-		b.WriteString(fmt.Sprintf("  %s Scanning file access times...\n", m.spinner.View()))
+		scanBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(AccentColor).
+			Padding(1, 3).
+			Width(50).
+			Align(lipgloss.Center)
+
+		titleLine := lipgloss.NewStyle().Foreground(AccentColor).Bold(true).Render("Zombie Hunter")
+		spinnerLine := fmt.Sprintf("%s  Scanning file access times...", m.spinner.View())
+		pathLine := DimStyle.Render(fmt.Sprintf("Path: %s", m.rootPath))
+		sizeLine := DimStyle.Render(fmt.Sprintf("Min size: %s", humanize.Bytes(uint64(m.minSize))))
+
+		boxContent := fmt.Sprintf("%s\n\n%s\n\n%s\n%s", titleLine, spinnerLine, pathLine, sizeLine)
+		b.WriteString(scanBox.Render(boxContent))
 		b.WriteString("\n")
-		b.WriteString(DimStyle.Render(fmt.Sprintf("  Scan path: %s\n", m.rootPath)))
-		b.WriteString(DimStyle.Render(fmt.Sprintf("  Min size: %s\n", humanize.Bytes(uint64(m.minSize)))))
+		return Center(m.width, m.height, b.String())
+	}
+
+	if m.cleaning {
+		cleanBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(WarningColor).
+			Padding(1, 3).
+			Width(50).
+			Align(lipgloss.Center)
+
+		titleLine := lipgloss.NewStyle().Foreground(WarningColor).Bold(true).Render("Cleaning")
+		spinnerLine := fmt.Sprintf("%s  Moving zombie files to Trash...", m.spinner.View())
+
+		boxContent := fmt.Sprintf("%s\n\n%s", titleLine, spinnerLine)
+		b.WriteString(cleanBox.Render(boxContent))
+		b.WriteString("\n")
 		return Center(m.width, m.height, b.String())
 	}
 
@@ -250,55 +375,128 @@ func (m *ZombieHunterView) View() string {
 
 	// Help bar
 	b.WriteString("\n")
-	helpKeys := []KeyHelp{
-		{"tab/h/l", "switch view"},
-		{"j/k", "navigate"},
-		{"r", "refresh"},
-		{"esc", "back"},
+	if m.confirming {
+		selectedSize := int64(0)
+		selectedCount := 0
+		if stat, ok := m.result.Stats[scanner.RangeZombie]; ok {
+			for i, f := range stat.Files {
+				if m.selected[i] {
+					selectedSize += f.Size
+					selectedCount++
+				}
+			}
+		}
+		confirmBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(WarningColor).
+			Padding(0, 2)
+		confirmContent := WarningStyle.Render(fmt.Sprintf("Move %d zombie files (%s) to Trash?", selectedCount, humanize.Bytes(uint64(selectedSize))))
+		b.WriteString(confirmBox.Render(confirmContent))
+		b.WriteString("\n\n")
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "y", Desc: "confirm"},
+			{Key: "n/esc", Desc: "cancel"},
+		}))
+	} else if m.selectedTab == 1 {
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "tab/h/l", Desc: "switch view"},
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "space", Desc: "toggle"},
+			{Key: "a", Desc: "all"},
+			{Key: "d", Desc: "clean"},
+			{Key: "r", Desc: "refresh"},
+		}))
+	} else {
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "tab/h/l", Desc: "switch view"},
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "r", Desc: "refresh"},
+			{Key: "esc", Desc: "back"},
+		}))
 	}
-	b.WriteString(StyledHelpBar(helpKeys))
 
 	return Center(m.width, m.height, b.String())
 }
 
 func (m *ZombieHunterView) renderTabs() string {
-	tabs := []string{"Heatmap", "Zombie Files", "Hot Files"}
+	tabs := []struct {
+		icon  string
+		label string
+	}{
+		{"#", "Heatmap"},
+		{"x", "Zombie Files"},
+		{">", "Hot Files"},
+	}
 	var parts []string
 
 	for i, tab := range tabs {
-		style := lipgloss.NewStyle().Padding(0, 2)
+		label := fmt.Sprintf(" %s %s ", tab.icon, tab.label)
 		if i == m.selectedTab {
-			style = style.Foreground(WhiteColor).Background(PrimaryColor).Bold(true)
+			style := lipgloss.NewStyle().
+				Foreground(WhiteColor).
+				Background(PrimaryColor).
+				Bold(true).
+				Padding(0, 1)
+			parts = append(parts, style.Render(label))
 		} else {
-			style = style.Foreground(GrayColor)
+			style := lipgloss.NewStyle().
+				Foreground(GrayColor).
+				Padding(0, 1)
+			parts = append(parts, style.Render(label))
 		}
-		parts = append(parts, style.Render(tab))
 	}
 
-	return "  " + lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+	tabLine := lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+	sepLine := DimStyle.Render(strings.Repeat("─", 68))
+	return "  " + tabLine + "\n  " + sepLine
 }
 
 func (m *ZombieHunterView) renderHeatmap() string {
 	var b strings.Builder
 
-	// Summary stats
+	// Summary cards
 	totalSize := m.result.GetTotalSize()
 	zombieSize := m.result.GetZombieSize()
 	zombiePercent := m.result.GetZombiePercentage()
 
-	b.WriteString(fmt.Sprintf("  Total scanned: %s (>%s)\n",
-		humanize.Bytes(uint64(totalSize)),
-		humanize.Bytes(uint64(m.minSize))))
-	b.WriteString(fmt.Sprintf("  Zombie files: %s (%.1f%%)\n",
-		lipgloss.NewStyle().Foreground(lipgloss.Color(scanner.RangeZombie.Color())).Bold(true).Render(humanize.Bytes(uint64(zombieSize))),
-		zombiePercent))
-	b.WriteString("\n")
+	cardStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(DimColor).
+		Padding(0, 2).
+		Width(21)
+
+	totalCard := cardStyle.Copy().BorderForeground(PrimaryColor).Render(
+		lipgloss.NewStyle().Foreground(GrayColor).Render("Total Scanned") + "\n" +
+			lipgloss.NewStyle().Foreground(PrimaryColor).Bold(true).Render(humanize.Bytes(uint64(totalSize))))
+
+	zombieCard := cardStyle.Copy().BorderForeground(lipgloss.Color(scanner.RangeZombie.Color())).Render(
+		lipgloss.NewStyle().Foreground(GrayColor).Render("Zombie Files") + "\n" +
+			lipgloss.NewStyle().Foreground(lipgloss.Color(scanner.RangeZombie.Color())).Bold(true).Render(humanize.Bytes(uint64(zombieSize))))
+
+	pctLabel := fmt.Sprintf("%.1f%%", zombiePercent)
+	pctColor := SecondaryColor
+	if zombiePercent > 50 {
+		pctColor = DangerColor
+	} else if zombiePercent > 25 {
+		pctColor = WarningColor
+	}
+	pctCard := cardStyle.Copy().BorderForeground(pctColor).Render(
+		lipgloss.NewStyle().Foreground(GrayColor).Render("Zombie Ratio") + "\n" +
+			lipgloss.NewStyle().Foreground(pctColor).Bold(true).Render(pctLabel))
+
+	b.WriteString("  " + lipgloss.JoinHorizontal(lipgloss.Top, totalCard, " ", zombieCard, " ", pctCard))
+	b.WriteString("\n\n")
 
 	// Heatmap blocks
 	blocks := m.getHeatmapBlocks()
 	if len(blocks) > 0 {
 		b.WriteString("  " + TitleStyle.Render("File Activity Heatmap") + "\n\n")
 
+		// Stacked bar (overview)
+		b.WriteString(m.renderStackedBar(blocks))
+		b.WriteString("\n\n")
+
+		// Detail bars
 		for _, block := range blocks {
 			b.WriteString(m.renderHeatmapBlock(block))
 			b.WriteString("\n")
@@ -307,9 +505,52 @@ func (m *ZombieHunterView) renderHeatmap() string {
 
 	// Size filter hint
 	b.WriteString("\n")
-	b.WriteString(DimStyle.Render("  Press number to filter: [1]10MB [2]50MB [3]100MB [4]500MB"))
+	filterStyle := lipgloss.NewStyle().Foreground(GrayColor)
+	keyStyle := lipgloss.NewStyle().Foreground(PrimaryColor).Bold(true)
+	b.WriteString("  " + filterStyle.Render("Filter: ") +
+		keyStyle.Render("1") + filterStyle.Render(" 10MB  ") +
+		keyStyle.Render("2") + filterStyle.Render(" 50MB  ") +
+		keyStyle.Render("3") + filterStyle.Render(" 100MB  ") +
+		keyStyle.Render("4") + filterStyle.Render(" 500MB"))
 
 	return b.String()
+}
+
+// renderStackedBar renders all ranges as a single stacked bar for overview
+func (m *ZombieHunterView) renderStackedBar(blocks []heatmapBlock) string {
+	barWidth := 64
+	var bar strings.Builder
+	bar.WriteString("  ")
+
+	for _, block := range blocks {
+		segmentWidth := int(block.Percent / 100 * float64(barWidth))
+		if segmentWidth < 1 && block.Percent > 0 {
+			segmentWidth = 1
+		}
+		bar.WriteString(lipgloss.NewStyle().Foreground(block.Color).Render(strings.Repeat("█", segmentWidth)))
+	}
+
+	// Fill remaining
+	totalFilled := 0
+	for _, block := range blocks {
+		segmentWidth := int(block.Percent / 100 * float64(barWidth))
+		if segmentWidth < 1 && block.Percent > 0 {
+			segmentWidth = 1
+		}
+		totalFilled += segmentWidth
+	}
+	if totalFilled < barWidth {
+		bar.WriteString(DimStyle.Render(strings.Repeat("░", barWidth-totalFilled)))
+	}
+
+	// Legend line
+	var legend []string
+	for _, block := range blocks {
+		dot := lipgloss.NewStyle().Foreground(block.Color).Render("█")
+		legend = append(legend, fmt.Sprintf("%s %s", dot, lipgloss.NewStyle().Foreground(GrayColor).Render(block.Label)))
+	}
+
+	return bar.String() + "\n  " + strings.Join(legend, "  ")
 }
 
 func (m *ZombieHunterView) getHeatmapBlocks() []heatmapBlock {
@@ -348,27 +589,30 @@ func (m *ZombieHunterView) getHeatmapBlocks() []heatmapBlock {
 }
 
 func (m *ZombieHunterView) renderHeatmapBlock(block heatmapBlock) string {
-	barWidth := 40
+	barWidth := 30
 	filled := int(block.Percent / 100 * float64(barWidth))
 	if filled > barWidth {
 		filled = barWidth
 	}
-	if filled < 1 {
+	if filled < 1 && block.Percent > 0 {
 		filled = 1
 	}
 
-	// Use ProgressBar style: # for filled, - for empty
-	bar := ProgressBar(block.Percent, barWidth, block.Color, DimColor)
+	// Use block chars for a smoother look
+	filledBar := lipgloss.NewStyle().Foreground(block.Color).Render(strings.Repeat("█", filled))
+	emptyBar := DimStyle.Render(strings.Repeat("░", barWidth-filled))
 
-	sizeStr := humanize.Bytes(uint64(block.Size))
-	label := fmt.Sprintf("[%s] %-20s", block.Icon, block.Label)
+	sizeStr := lipgloss.NewStyle().Foreground(block.Color).Bold(true).Render(humanize.Bytes(uint64(block.Size)))
+	countStr := lipgloss.NewStyle().Foreground(GrayColor).Render(fmt.Sprintf("%d files", block.Count))
+	label := lipgloss.NewStyle().Foreground(block.Color).Render(fmt.Sprintf("%-18s", block.Label))
+	pctStr := lipgloss.NewStyle().Foreground(LightGrayColor).Render(fmt.Sprintf("%5.1f%%", block.Percent))
 
-	// Format: [icon] Label |██████████████████░░░░░░░░| 50% (12 GB)
-	line := fmt.Sprintf("  %s %s %5.1f%% (%s)",
+	line := fmt.Sprintf("  %s %s%s %s  %s  %s",
 		label,
-		bar,
-		block.Percent,
-		sizeStr)
+		filledBar, emptyBar,
+		pctStr,
+		sizeStr,
+		countStr)
 
 	return line
 }
@@ -376,20 +620,29 @@ func (m *ZombieHunterView) renderHeatmapBlock(block heatmapBlock) string {
 func (m *ZombieHunterView) renderZombieList() string {
 	var b strings.Builder
 
-	b.WriteString("  " + TitleStyle.Render("Zombie Files (>1 year unused)") + "\n\n")
+	b.WriteString("  " + TitleStyle.Render("Zombie Files") + "  ")
+	b.WriteString(lipgloss.NewStyle().Foreground(GrayColor).Render("(>1 year unused)") + "\n\n")
 
 	if stat, ok := m.result.Stats[scanner.RangeZombie]; !ok || len(stat.Files) == 0 {
-		b.WriteString("  No zombie files found!\n")
-		b.WriteString(DimStyle.Render("\n  Your files are all active~"))
+		emptyBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(SecondaryColor).
+			Padding(1, 3).
+			Width(44).
+			Align(lipgloss.Center)
+		content := lipgloss.NewStyle().Foreground(SecondaryColor).Bold(true).Render("All Clear!") + "\n" +
+			lipgloss.NewStyle().Foreground(GrayColor).Render("No zombie files found. All files are active.")
+		b.WriteString("  " + emptyBox.Render(content))
 		return b.String()
 	} else {
-		// Header
-		b.WriteString("  ")
-		b.WriteString(TableHeader([]string{"Filename", "Size", "Last Access"}, []int{40, 12, 15}))
-		b.WriteString("\n")
-		b.WriteString("  ")
-		b.WriteString(Divider(70))
-		b.WriteString("\n")
+		// Table header with styled separators
+		headerStyle := lipgloss.NewStyle().Foreground(LightGrayColor).Bold(true)
+		b.WriteString(fmt.Sprintf("  %s %s %s %s\n",
+			headerStyle.Render(padRight("", 3)),
+			headerStyle.Render(padRight("Filename", 36)),
+			headerStyle.Render(padLeft("Size", 12)),
+			headerStyle.Render(padLeft("Last Access", 15))))
+		b.WriteString("  " + DimStyle.Render(strings.Repeat("─", 68)) + "\n")
 
 		// Files
 		visibleLines := m.getVisibleLines()
@@ -400,7 +653,8 @@ func (m *ZombieHunterView) renderZombieList() string {
 
 		for i := m.scrollOffset; i < endIdx; i++ {
 			file := stat.Files[i]
-			line := m.formatFileLine(file, i == m.cursor)
+			cb := Checkbox(m.selected[i])
+			line := m.formatFileLineWithCb(file, cb, i == m.cursor)
 			b.WriteString(line)
 			b.WriteString("\n")
 		}
@@ -414,12 +668,29 @@ func (m *ZombieHunterView) renderZombieList() string {
 			b.WriteString("  " + below + "\n")
 		}
 
-		// Summary
+		// Summary bar with visual stats
+		selectedSize := int64(0)
+		selectedCount := 0
+		for i, f := range stat.Files {
+			if m.selected[i] {
+				selectedSize += f.Size
+				selectedCount++
+			}
+		}
 		b.WriteString("\n")
-		b.WriteString(StatsBar([]string{
-			fmt.Sprintf("Total: %d files", len(stat.Files)),
-			fmt.Sprintf("Size: %s", humanize.Bytes(uint64(stat.TotalSize))),
-		}))
+
+		statParts := []string{
+			lipgloss.NewStyle().Foreground(GrayColor).Render("Total: ") +
+				lipgloss.NewStyle().Foreground(WhiteColor).Bold(true).Render(fmt.Sprintf("%d files", len(stat.Files))),
+			lipgloss.NewStyle().Foreground(GrayColor).Render("Size: ") +
+				lipgloss.NewStyle().Foreground(WarningColor).Bold(true).Render(humanize.Bytes(uint64(stat.TotalSize))),
+		}
+		if selectedCount > 0 {
+			statParts = append(statParts,
+				lipgloss.NewStyle().Foreground(GrayColor).Render("Selected: ") +
+					lipgloss.NewStyle().Foreground(SecondaryColor).Bold(true).Render(fmt.Sprintf("%s (%d)", humanize.Bytes(uint64(selectedSize)), selectedCount)))
+		}
+		b.WriteString("  " + strings.Join(statParts, DimStyle.Render("  |  ")))
 	}
 
 	return b.String()
@@ -428,7 +699,8 @@ func (m *ZombieHunterView) renderZombieList() string {
 func (m *ZombieHunterView) renderHotFiles() string {
 	var b strings.Builder
 
-	b.WriteString("  " + TitleStyle.Render("Hot Files (accessed in 30 days)") + "\n\n")
+	b.WriteString("  " + TitleStyle.Render("Hot Files") + "  ")
+	b.WriteString(lipgloss.NewStyle().Foreground(GrayColor).Render("(accessed in 30 days)") + "\n\n")
 
 	// Collect hot files
 	var hotFiles []scanner.ZombieFileInfo
@@ -439,18 +711,25 @@ func (m *ZombieHunterView) renderHotFiles() string {
 	}
 
 	if len(hotFiles) == 0 {
-		b.WriteString("  No hot files found\n")
-		b.WriteString(DimStyle.Render("\n  Few large files accessed recently"))
+		emptyBox := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(GrayColor).
+			Padding(1, 3).
+			Width(44).
+			Align(lipgloss.Center)
+		content := lipgloss.NewStyle().Foreground(GrayColor).Render("No hot files found") + "\n" +
+			lipgloss.NewStyle().Foreground(DimColor).Render("Few large files accessed recently")
+		b.WriteString("  " + emptyBox.Render(content))
 		return b.String()
 	}
 
 	// Header
-	b.WriteString("  ")
-	b.WriteString(TableHeader([]string{"Filename", "Size", "Last Access"}, []int{40, 12, 15}))
-	b.WriteString("\n")
-	b.WriteString("  ")
-	b.WriteString(Divider(70))
-	b.WriteString("\n")
+	headerStyle := lipgloss.NewStyle().Foreground(LightGrayColor).Bold(true)
+	b.WriteString(fmt.Sprintf("  %s %s %s\n",
+		headerStyle.Render(padRight("Filename", 40)),
+		headerStyle.Render(padLeft("Size", 12)),
+		headerStyle.Render(padLeft("Last Access", 15))))
+	b.WriteString("  " + DimStyle.Render(strings.Repeat("─", 68)) + "\n")
 
 	// Files
 	visibleLines := m.getVisibleLines()
@@ -481,31 +760,58 @@ func (m *ZombieHunterView) renderHotFiles() string {
 func (m *ZombieHunterView) formatFileLine(file scanner.ZombieFileInfo, selected bool) string {
 	name := truncate(filepath.Base(file.Path), 40)
 	size := padLeft(humanize.Bytes(uint64(file.Size)), 12)
+	accessStr, accessStyle := m.formatAccessTimeStyled(file)
 
-	var accessStr string
-	// Calculate days since last access
-	days := int(time.Since(file.AccessTime).Hours() / 24)
-	if days < 0 {
-		days = 0
-	}
-
-	if days == 0 {
-		accessStr = "today"
-	} else if days < 7 {
-		accessStr = fmt.Sprintf("%dd ago", days)
-	} else if days < 30 {
-		accessStr = fmt.Sprintf("%dw ago", days/7)
-	} else if days < 365 {
-		accessStr = fmt.Sprintf("%dmo ago", days/30)
-	} else {
-		accessStr = fmt.Sprintf("%dy ago", days/365)
-	}
-	accessStr = padLeft(accessStr, 15)
-
-	line := fmt.Sprintf("  %s %s %s", name, size, DimStyle.Render(accessStr))
+	line := fmt.Sprintf("  %s %s %s", name, size, accessStyle.Render(accessStr))
 
 	if selected {
 		return SelectedScanItemStyle.Render(line)
 	}
 	return ScanItemStyle.Render(line)
+}
+
+func (m *ZombieHunterView) formatFileLineWithCb(file scanner.ZombieFileInfo, cb string, selected bool) string {
+	name := truncate(filepath.Base(file.Path), 36)
+	size := padLeft(humanize.Bytes(uint64(file.Size)), 12)
+	accessStr, accessStyle := m.formatAccessTimeStyled(file)
+
+	line := fmt.Sprintf("  %s %s %s %s", cb, name, size, accessStyle.Render(accessStr))
+
+	if selected {
+		return SelectedScanItemStyle.Render(line)
+	}
+	return ScanItemStyle.Render(line)
+}
+
+func (m *ZombieHunterView) formatAccessTimeStyled(file scanner.ZombieFileInfo) (string, lipgloss.Style) {
+	days := int(time.Since(file.AccessTime).Hours() / 24)
+	if days < 0 {
+		days = 0
+	}
+
+	var accessStr string
+	var style lipgloss.Style
+
+	switch {
+	case days == 0:
+		accessStr = "today"
+		style = lipgloss.NewStyle().Foreground(lipgloss.Color(scanner.RangeRecent7d.Color()))
+	case days < 7:
+		accessStr = fmt.Sprintf("%dd ago", days)
+		style = lipgloss.NewStyle().Foreground(lipgloss.Color(scanner.RangeRecent7d.Color()))
+	case days < 30:
+		accessStr = fmt.Sprintf("%dw ago", days/7)
+		style = lipgloss.NewStyle().Foreground(lipgloss.Color(scanner.RangeRecent30d.Color()))
+	case days < 90:
+		accessStr = fmt.Sprintf("%dmo ago", days/30)
+		style = lipgloss.NewStyle().Foreground(lipgloss.Color(scanner.RangeRecent90d.Color()))
+	case days < 365:
+		accessStr = fmt.Sprintf("%dmo ago", days/30)
+		style = lipgloss.NewStyle().Foreground(lipgloss.Color(scanner.RangeRecent1y.Color()))
+	default:
+		accessStr = fmt.Sprintf("%dy ago", days/365)
+		style = lipgloss.NewStyle().Foreground(lipgloss.Color(scanner.RangeZombie.Color()))
+	}
+
+	return padLeft(accessStr, 15), style
 }

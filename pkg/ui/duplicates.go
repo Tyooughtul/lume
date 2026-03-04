@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -20,6 +19,7 @@ type DuplicatesView struct {
 	scrollOffset int
 	scanning     bool
 	cleaning     bool
+	confirming   bool
 	showDetail   bool
 	spinner      spinner.Model
 	width        int
@@ -46,7 +46,7 @@ func NewDuplicatesView() *DuplicatesView {
 
 	return &DuplicatesView{
 		spinner:    s,
-		rootPath:   filepath.Join(homeDir, "Downloads"),
+		rootPath:   homeDir,
 		keepNewest: true,
 		resultCh:   make(chan dupScanResult, 1),
 		selected:   make(map[int]bool),
@@ -84,6 +84,17 @@ func (m *DuplicatesView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateScrollOffset()
 
 	case tea.KeyMsg:
+		if m.confirming {
+			switch msg.String() {
+			case "y", "Y":
+				m.confirming = false
+				return m, m.startClean()
+			case "n", "N", "esc":
+				m.confirming = false
+			}
+			return m, nil
+		}
+
 		if m.scanning || m.cleaning {
 			switch msg.String() {
 			case "q", "ctrl+c":
@@ -138,7 +149,16 @@ func (m *DuplicatesView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			return m, m.startScan()
 		case "d", "c":
-			return m, m.startClean()
+			hasSelected := false
+			for _, v := range m.selected {
+				if v {
+					hasSelected = true
+					break
+				}
+			}
+			if hasSelected {
+				m.confirming = true
+			}
 		}
 
 	case dupScanResult:
@@ -308,14 +328,31 @@ func (m DuplicatesView) View() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "j/k", Desc: "navigate"},
-		{Key: "space", Desc: "toggle"},
-		{Key: "a", Desc: "all"},
-		{Key: "i", Desc: "info"},
-		{Key: "t", Desc: "strategy"},
-		{Key: "d", Desc: "delete"},
-	}))
+	if m.confirming {
+		selectedReclaim := int64(0)
+		selectedCount := 0
+		for i := range m.groups {
+			if m.selected[i] {
+				selectedReclaim += int64(len(m.groups[i].Files)-1) * m.groups[i].Size
+				selectedCount++
+			}
+		}
+		b.WriteString("  " + WarningStyle.Render(fmt.Sprintf("Move duplicates from %d groups (%s) to Trash?", selectedCount, humanize.Bytes(uint64(selectedReclaim)))))
+		b.WriteString("\n\n")
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "y", Desc: "confirm"},
+			{Key: "n/esc", Desc: "cancel"},
+		}))
+	} else {
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "space", Desc: "toggle"},
+			{Key: "a", Desc: "all"},
+			{Key: "i", Desc: "info"},
+			{Key: "t", Desc: "strategy"},
+			{Key: "d", Desc: "delete"},
+		}))
+	}
 
 	return Center(m.width, m.height, b.String())
 }
@@ -355,7 +392,7 @@ func (m DuplicatesView) detailView() string {
 		b.WriteString("\n")
 		b.WriteString(InfoBoxStyle.Render(fmt.Sprintf("Strategy: %s (press 't' to toggle)", strategy)))
 		b.WriteString("\n\n")
-		b.WriteString(WarningStyle.Render("[!] This action cannot be undone"))
+		b.WriteString(SuccessStyle.Render("[i] Files will be moved to Trash (recoverable)"))
 	}
 
 	return Center(m.width, m.height, b.String())

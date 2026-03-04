@@ -4,13 +4,15 @@ BINARY_NAME=lume
 BUILD_DIR=.
 CMD_PATH=./cmd/lume/...
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+
 # Default build target
 all: build
 
 # Build the project
 build:
-	@echo "Building $(BINARY_NAME)..."
-	go build -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_PATH)
+	@echo "Building $(BINARY_NAME) $(VERSION)..."
+	go build -ldflags "-s -w -X github.com/Tyooughtul/lume/pkg/ui.AppVersion=$(VERSION)" -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
 # Run the project

@@ -19,6 +19,7 @@ type BrowserDataView struct {
 	browserCursor int
 	scanning      bool
 	cleaning      bool
+	confirming    bool
 	spinner       spinner.Model
 	width         int
 	height        int
@@ -74,6 +75,17 @@ func (m *BrowserDataView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 	case tea.KeyMsg:
+		if m.confirming {
+			switch msg.String() {
+			case "y", "Y":
+				m.confirming = false
+				return m, m.startClean()
+			case "n", "N", "esc":
+				m.confirming = false
+			}
+			return m, nil
+		}
+
 		if m.scanning || m.cleaning {
 			switch msg.String() {
 			case "q", "ctrl+c":
@@ -158,7 +170,21 @@ func (m *BrowserDataView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "r":
 			return m, m.startScan()
 		case "d", "c":
-			return m, m.startClean()
+			hasSelected := false
+			for _, browser := range m.browsers {
+				for _, item := range browser.Data {
+					if item.Selected {
+						hasSelected = true
+						break
+					}
+				}
+				if hasSelected {
+					break
+				}
+			}
+			if hasSelected {
+				m.confirming = true
+			}
 		}
 
 	case browserScanResult:
@@ -284,14 +310,37 @@ func (m BrowserDataView) View() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "j/k", Desc: "navigate"},
-		{Key: "space", Desc: "toggle"},
-		{Key: "enter", Desc: "details"},
-		{Key: "a", Desc: "all"},
-		{Key: "d", Desc: "clean"},
-		{Key: "r", Desc: "refresh"},
-	}))
+	if m.confirming {
+		selectedSize := int64(0)
+		browserCount := 0
+		for _, browser := range m.browsers {
+			hasSel := false
+			for _, item := range browser.Data {
+				if item.Selected {
+					selectedSize += item.Size
+					hasSel = true
+				}
+			}
+			if hasSel {
+				browserCount++
+			}
+		}
+		b.WriteString("  " + WarningStyle.Render(fmt.Sprintf("Clean data from %d browsers (%s) to Trash?", browserCount, humanize.Bytes(uint64(selectedSize)))))
+		b.WriteString("\n\n")
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "y", Desc: "confirm"},
+			{Key: "n/esc", Desc: "cancel"},
+		}))
+	} else {
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "space", Desc: "toggle"},
+			{Key: "enter", Desc: "details"},
+			{Key: "a", Desc: "all"},
+			{Key: "d", Desc: "clean"},
+			{Key: "r", Desc: "refresh"},
+		}))
+	}
 
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, b.String())
 }

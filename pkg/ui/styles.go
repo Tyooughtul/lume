@@ -9,10 +9,11 @@ import (
 )
 
 // Application info
-const (
-	AppName    = "Lume"
-	AppVersion = "v1.0.0"
-)
+const AppName = "Lume"
+
+// AppVersion is the application version.
+// Override at build time: go build -ldflags "-X github.com/Tyooughtul/lume/pkg/ui.AppVersion=vX.Y.Z"
+var AppVersion = "v1.0.0"
 
 // Theme colors — cohesive modern palette
 var (

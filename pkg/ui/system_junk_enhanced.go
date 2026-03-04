@@ -19,6 +19,7 @@ type SystemJunkViewEnhanced struct {
 	scrollOffset int
 	scanning     bool
 	cleaning     bool
+	confirming   bool
 	showPreview  bool
 	showErrors   bool
 	previewIndex int
@@ -42,6 +43,7 @@ type SystemJunkViewEnhanced struct {
 	detailErr        error
 	detailResultCh   chan detailResultMsg
 }
+
 
 type scanResultEnhanced struct {
 	targets []scanner.ScanTarget
@@ -109,6 +111,17 @@ func (m *SystemJunkViewEnhanced) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateScrollOffset()
 
 	case tea.KeyMsg:
+		if m.confirming {
+			switch msg.String() {
+			case "y", "Y":
+				m.confirming = false
+				return m, m.startClean()
+			case "n", "N", "esc":
+				m.confirming = false
+			}
+			return m, nil
+		}
+
 		if m.scanning || m.cleaning {
 			switch msg.String() {
 			case "q", "ctrl+c":
@@ -185,7 +198,16 @@ func (m *SystemJunkViewEnhanced) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.showErrors = true
 			}
 		case "d", "c":
-			return m, m.startClean()
+			hasSelected := false
+			for _, t := range m.targets {
+				if t.Selected {
+					hasSelected = true
+					break
+				}
+			}
+			if hasSelected {
+				m.confirming = true
+			}
 		case "r":
 			return m, m.startScan()
 		}
@@ -482,15 +504,32 @@ func (m SystemJunkViewEnhanced) View() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(StyledHelpBar([]KeyHelp{
-		{Key: "j/k", Desc: "navigate"},
-		{Key: "space", Desc: "toggle"},
-		{Key: "a", Desc: "all"},
-		{Key: "e", Desc: "detail"},
-		{Key: "p", Desc: "preview"},
-		{Key: "d", Desc: "clean"},
-		{Key: "r", Desc: "refresh"},
-	}))
+	if m.confirming {
+		selectedCount := 0
+		selectedSize := int64(0)
+		for _, t := range m.targets {
+			if t.Selected {
+				selectedCount++
+				selectedSize += t.Size
+			}
+		}
+		b.WriteString("  " + WarningStyle.Render(fmt.Sprintf("Move %d items (%s) to Trash?", selectedCount, humanize.Bytes(uint64(selectedSize)))))
+		b.WriteString("\n\n")
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "y", Desc: "confirm"},
+			{Key: "n/esc", Desc: "cancel"},
+		}))
+	} else {
+		b.WriteString(StyledHelpBar([]KeyHelp{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "space", Desc: "toggle"},
+			{Key: "a", Desc: "all"},
+			{Key: "e", Desc: "detail"},
+			{Key: "p", Desc: "preview"},
+			{Key: "d", Desc: "clean"},
+			{Key: "r", Desc: "refresh"},
+		}))
+	}
 
 	return Center(m.width, m.height, b.String())
 }
